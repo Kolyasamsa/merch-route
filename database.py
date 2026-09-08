@@ -1,3 +1,4 @@
+```python
 import uuid
 from datetime import datetime
 
@@ -72,6 +73,7 @@ def create_visit(
     )
 
     if not response.data:
+
         raise RuntimeError(
             "Не удалось создать запись о прохождении ТТ."
         )
@@ -139,6 +141,7 @@ def upload_visit_photos(
 ):
 
     if not files:
+
         return []
 
     uploaded = []
@@ -202,7 +205,35 @@ def reset_visit(
     clear_database_cache()
 
 
+# =========================================================
+# РЕДАКТИРОВАНИЕ КОММЕНТАРИЯ
+# =========================================================
+
+def update_visit_comment(
+    visit_id,
+    comment,
+):
+
+    (
+        supabase
+        .table("point_visits")
+        .update(
+            {
+                "comment": comment,
+            }
+        )
+        .eq(
+            "id",
+            str(visit_id),
+        )
+        .execute()
+    )
+
+    clear_database_cache()
+
+
 def clear_database_cache():
 
     get_completed_visits.clear()
     get_visit_photos.clear()
+```
