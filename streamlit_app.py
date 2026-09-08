@@ -1,4 +1,3 @@
-```python
 import streamlit as st
 import pandas as pd
 from datetime import datetime
@@ -306,4 +305,3 @@ with st.expander(
             f"**{worker_name}: "
             f"{len(worker_data)} ТТ**"
         )
-```
