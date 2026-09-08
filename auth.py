@@ -1,221 +1,148 @@
 import streamlit as st
 
+
 # =========================================================
-
 # ПОИСК ПОЛЬЗОВАТЕЛЯ ПО ПАРОЛЮ
-
 # =========================================================
 
 def get_user_by_password(password):
-"""
-Возвращает:
 
-```
-user_name
-user_role
-"""
+    workers = st.secrets.get(
+        "workers",
+        {},
+    )
 
-# -----------------------------------------------------
-# МЕРЧЕНДАЙЗЕРЫ
-# -----------------------------------------------------
+    for worker, worker_password in workers.items():
 
-workers = st.secrets.get(
-    "workers",
-    {},
-)
+        if password == worker_password:
 
-for worker, worker_password in workers.items():
-
-    if password == worker_password:
-
-        return (
-            worker,
-            "worker",
-        )
+            return worker, "worker"
 
 
-# -----------------------------------------------------
-# СУПЕРВАЙЗЕРЫ
-# -----------------------------------------------------
+    supervisors = st.secrets.get(
+        "supervisors",
+        {},
+    )
 
-supervisors = st.secrets.get(
-    "supervisors",
-    {},
-)
+    for supervisor, supervisor_password in supervisors.items():
 
-for supervisor, supervisor_password in supervisors.items():
+        if password == supervisor_password:
 
-    if password == supervisor_password:
-
-        return (
-            supervisor,
-            "supervisor",
-        )
+            return supervisor, "supervisor"
 
 
-# -----------------------------------------------------
-# ПОЛЬЗОВАТЕЛЬ НЕ НАЙДЕН
-# -----------------------------------------------------
+    return None, None
 
-return (
-    None,
-    None,
-)
-```
 
 # =========================================================
-
 # ВХОД
-
 # =========================================================
 
 def login():
-"""
-Авторизация пользователя.
 
-```
-Всегда возвращает:
-
-user_name
-user_role
-"""
-
-# -----------------------------------------------------
-# ПОЛЬЗОВАТЕЛЬ УЖЕ ВОШЁЛ
-# -----------------------------------------------------
-
-if (
-    "user_name" in st.session_state
-    and "user_role" in st.session_state
-):
-
-    return (
-        st.session_state["user_name"],
-        st.session_state["user_role"],
-    )
-
-
-# -----------------------------------------------------
-# ЭКРАН ВХОДА
-# -----------------------------------------------------
-
-st.title(
-    "📍 Маршруты мерчендайзеров"
-)
-
-
-st.caption(
-    "Введите свой пароль"
-)
-
-
-password = st.text_input(
-    "🔐 Пароль",
-    type="password",
-    key="login_password",
-)
-
-
-# -----------------------------------------------------
-# КНОПКА ВХОДА
-# -----------------------------------------------------
-
-if st.button(
-    "Войти",
-    type="primary",
-    use_container_width=True,
-):
-
-    if not password:
-
-        st.warning(
-            "Введите пароль."
-        )
+    # Если пользователь уже авторизован
+    if (
+        "user_name" in st.session_state
+        and "user_role" in st.session_state
+    ):
 
         return (
-            None,
-            None,
+            st.session_state["user_name"],
+            st.session_state["user_role"],
         )
 
 
-    user_name, user_role = (
-        get_user_by_password(
-            password
-        )
+    # Экран входа
+    st.title(
+        "📍 Маршруты мерчендайзеров"
     )
 
 
-    # -------------------------------------------------
-    # УСПЕШНЫЙ ВХОД
-    # -------------------------------------------------
-
-    if user_name:
-
-        st.session_state[
-            "user_name"
-        ] = user_name
+    st.caption(
+        "Введите свой пароль"
+    )
 
 
-        st.session_state[
-            "user_role"
-        ] = user_role
+    password = st.text_input(
+        "🔐 Пароль",
+        type="password",
+        key="login_password",
+    )
 
 
-        st.rerun()
+    if st.button(
+        "Войти",
+        type="primary",
+        use_container_width=True,
+    ):
+
+        if not password:
+
+            st.warning(
+                "Введите пароль."
+            )
+
+            return None, None
 
 
-    # -------------------------------------------------
-    # НЕВЕРНЫЙ ПАРОЛЬ
-    # -------------------------------------------------
-
-    else:
-
-        st.error(
-            "Неверный пароль."
+        user_name, user_role = (
+            get_user_by_password(
+                password
+            )
         )
 
 
-# =====================================================
-# ВАЖНО:
-# Даже если пользователь ещё ничего не ввёл,
-# функция ВСЕГДА возвращает ДВА значения.
-# =====================================================
+        if user_name:
 
-return (
-    None,
-    None,
-)
-```
+            st.session_state[
+                "user_name"
+            ] = user_name
+
+
+            st.session_state[
+                "user_role"
+            ] = user_role
+
+
+            st.rerun()
+
+
+        else:
+
+            st.error(
+                "Неверный пароль."
+            )
+
+
+    # ВАЖНО:
+    # streamlit_app.py ожидает два значения
+    return None, None
+
 
 # =========================================================
-
 # ВЫХОД
-
 # =========================================================
 
 def logout():
 
-```
-st.session_state.pop(
-    "user_name",
-    None,
-)
+    st.session_state.pop(
+        "user_name",
+        None,
+    )
 
 
-st.session_state.pop(
-    "user_role",
-    None,
-)
+    st.session_state.pop(
+        "user_role",
+        None,
+    )
 
 
-# Удаляем старый ключ
-# от предыдущей версии приложения
+    # Удаляем старый ключ от предыдущей версии,
+    # если он остался в сессии
+    st.session_state.pop(
+        "worker",
+        None,
+    )
 
-st.session_state.pop(
-    "worker",
-    None,
-)
 
-
-st.rerun()
-```
+    st.rerun()
