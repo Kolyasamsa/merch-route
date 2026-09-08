@@ -27,6 +27,8 @@ from database import (
     reset_visit,
     update_visit_comment,
     clear_database_cache,
+    get_visit_comments,
+    create_visit_comment,
 )
 
 from utils import (
@@ -879,7 +881,173 @@ for route in routes:
 
 
                             st.rerun()
+                # =============================================
+                # ОБСУЖДЕНИЕ ТТ
+                # =============================================
 
+                st.divider()
+
+                st.subheader(
+                    "💬 Обсуждение ТТ"
+                )
+
+                try:
+
+                    visit_comments = (
+                        get_visit_comments(
+                            visit["id"]
+                        )
+                    )
+
+                    # -----------------------------------------
+                    # СУЩЕСТВУЮЩИЕ КОММЕНТАРИИ
+                    # -----------------------------------------
+
+                    if visit_comments:
+
+                        for visit_comment in visit_comments:
+
+                            author = (
+                                visit_comment.get(
+                                    "author",
+                                    "Неизвестно",
+                                )
+                            )
+
+                            author_role = (
+                                visit_comment.get(
+                                    "author_role",
+                                    "",
+                                )
+                            )
+
+                            comment_text = (
+                                visit_comment.get(
+                                    "comment",
+                                    "",
+                                )
+                            )
+
+                            created_at = (
+                                visit_comment.get(
+                                    "created_at",
+                                    "",
+                                )
+                            )
+
+                            if (
+                                author_role
+                                == "supervisor"
+                            ):
+
+                                role_text = (
+                                    "👩‍💼 Супервайзер"
+                                )
+
+                            else:
+
+                                role_text = (
+                                    "👤 Мерчендайзер"
+                                )
+
+                            st.markdown(
+                                f"**{role_text}: "
+                                f"{author}**"
+                            )
+
+                            st.write(
+                                comment_text
+                            )
+
+                            if created_at:
+
+                                st.caption(
+                                    f"🕒 {created_at}"
+                                )
+
+                            st.divider()
+
+                    else:
+
+                        st.caption(
+                            "Комментариев пока нет."
+                        )
+
+                    # -----------------------------------------
+                    # НОВЫЙ КОММЕНТАРИЙ МЕРЧЕНДАЙЗЕРА
+                    # -----------------------------------------
+
+                    new_discussion_comment = (
+                        st.text_area(
+
+                            "Ответить в обсуждении",
+
+                            placeholder=(
+                                "Напишите ответ "
+                                "супервайзеру..."
+                            ),
+
+                            key=(
+                                f"worker_discussion_comment_"
+                                f"{visit['id']}"
+                            ),
+                        )
+                    )
+
+                    if st.button(
+
+                        "💬 Отправить ответ",
+
+                        key=(
+                            f"send_worker_discussion_comment_"
+                            f"{visit['id']}"
+                        ),
+
+                        type="primary",
+
+                        use_container_width=True,
+                    ):
+
+                        if not (
+                            new_discussion_comment.strip()
+                        ):
+
+                            st.warning(
+                                "Введите комментарий."
+                            )
+
+                        else:
+
+                            try:
+
+                                create_visit_comment(
+
+                                    visit["id"],
+
+                                    worker,
+
+                                    "worker",
+
+                                    new_discussion_comment,
+                                )
+
+                                st.rerun()
+
+                            except Exception as error:
+
+                                st.error(
+
+                                    f"Ошибка отправки "
+                                    f"комментария: {error}"
+                                )
+
+                except Exception as error:
+
+                    st.warning(
+
+                        f"Не удалось загрузить "
+                        f"комментарии: {error}"
+                    )
 
                 # =============================================
                 # ВРЕМЯ ПРОХОЖДЕНИЯ
