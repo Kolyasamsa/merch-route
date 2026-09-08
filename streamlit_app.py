@@ -1,8 +1,13 @@
+```python
 import streamlit as st
-import openpyxl
+import pandas as pd
 from datetime import datetime
 import os
 
+
+# ==========================================
+# НАСТРОЙКИ
+# ==========================================
 
 st.set_page_config(
     page_title="Маршруты мерчендайзеров",
@@ -11,127 +16,88 @@ st.set_page_config(
 )
 
 
-# ==========================================
-# ИМЯ EXCEL-ФАЙЛА
-# ==========================================
-
-EXCEL_FILE = "для проверки маршрут мерчей август (1).xlsx"
+EXCEL_FILE = "routes.xlsx"
 
 
 # ==========================================
-# ДНИ И ИХ КОЛОНКИ В ТВОЁМ EXCEL
-#
-# Понедельник:
-# A = сеть
-# B = адрес
-#
-# Вторник:
-# H = сеть
-# I = адрес
-#
-# Среда:
-# O = сеть
-# P = адрес
-#
-# Четверг и пятница пока определим
-# автоматически ниже.
+# ЗАГРУЗКА EXCEL
 # ==========================================
-
-DAY_COLUMNS = {
-    "Понедельник": (1, 2),
-    "Вторник": (8, 9),
-    "Среда": (15, 16),
-}
-
 
 @st.cache_data
 def load_routes():
 
-    routes = {}
-
     if not os.path.exists(EXCEL_FILE):
         return None
 
-    workbook = openpyxl.load_workbook(
-        EXCEL_FILE,
-        data_only=False
-    )
+    df = pd.read_excel(EXCEL_FILE)
 
-    for sheet_name in workbook.sheetnames:
+    # Убираем лишние пробелы
+    for column in [
+        "Мерчендайзер",
+        "Маршрут",
+        "День",
+        "Магазин",
+        "Адрес"
+    ]:
+        df[column] = (
+            df[column]
+            .astype(str)
+            .str.strip()
+        )
 
-        sheet = workbook[sheet_name]
+    return df
 
-        # Имя мерчендайзера находится в A1.
-        worker_name = sheet["A1"].value
 
-        if not worker_name:
-            worker_name = sheet_name
-
-        worker_name = str(worker_name).strip()
-
-        routes[worker_name] = {
-            "Понедельник": [],
-            "Вторник": [],
-            "Среда": [],
-            "Четверг": [],
-            "Пятница": []
-        }
-
-        # Читаем известные блоки маршрутов
-        for day, columns in DAY_COLUMNS.items():
-
-            shop_column = columns[0]
-            address_column = columns[1]
-
-            for row in range(3, sheet.max_row + 1):
-
-                shop = sheet.cell(
-                    row,
-                    shop_column
-                ).value
-
-                address = sheet.cell(
-                    row,
-                    address_column
-                ).value
-
-                # Если есть и сеть, и адрес —
-                # считаем это торговой точкой.
-                if shop and address:
-
-                    routes[worker_name][day].append({
-                        "shop": str(shop).strip(),
-                        "address": str(address).strip()
-                    })
-
-    return routes
+df = load_routes()
 
 
 # ==========================================
-# ЗАГРУЖАЕМ МАРШРУТЫ
+# ПРОВЕРКА ФАЙЛА
 # ==========================================
 
-routes = load_routes()
-
-
-# ==========================================
-# ЕСЛИ EXCEL НЕ НАЙДЕН
-# ==========================================
-
-if routes is None:
+if df is None:
 
     st.error(
-        "Excel-файл не найден. "
-        "Проверь, что он загружен в GitHub "
-        "и его название совпадает с названием "
-        "в переменной EXCEL_FILE."
+        "Файл routes.xlsx не найден. "
+        "Загрузи его в GitHub рядом "
+        "со streamlit_app.py"
     )
 
     st.stop()
 
 
 # ==========================================
-# ОПРЕДЕЛЯЕМ СЕГОДНЯШНИЙ ДЕНЬ
+# ПРОВЕРКА СТОЛБЦОВ
+# ==========================================
+
+required_columns = [
+    "Мерчендайзер",
+    "Маршрут",
+    "День",
+    "Магазин",
+    "Адрес"
+]
+
+
+missing_columns = [
+    column
+    for column in required_columns
+    if column not in df.columns
+]
+
+
+if missing_columns:
+
+    st.error(
+        "В Excel отсутствуют столбцы: "
+        + ", ".join(missing_columns)
+    )
+
+    st.stop()
+
+
+# ==========================================
+# ДНИ НЕДЕЛИ
 # ==========================================
 
 days = [
@@ -142,22 +108,30 @@ days = [
     "Пятница"
 ]
 
-today_number = datetime.today().weekday()
 
-if today_number < 5:
-    today = days[today_number]
+# ==========================================
+# ОПРЕДЕЛЯЕМ СЕГОДНЯ
+# ==========================================
+
+weekday_number = datetime.today().weekday()
+
+if weekday_number < 5:
+
+    today = days[weekday_number]
+
 else:
+
     today = "Понедельник"
 
 
 # ==========================================
-# ИНТЕРФЕЙС
+# ЗАГОЛОВОК
 # ==========================================
 
 st.title("📍 Маршруты мерчендайзеров")
 
 st.caption(
-    "Маршруты автоматически загружаются из Excel"
+    "Контроль торговых точек и прохождения маршрутов"
 )
 
 
@@ -165,9 +139,16 @@ st.caption(
 # ВЫБОР МЕРЧЕНДАЙЗЕРА
 # ==========================================
 
+workers = sorted(
+    df["Мерчендайзер"]
+    .unique()
+    .tolist()
+)
+
+
 worker = st.selectbox(
     "👤 Мерчендайзер",
-    list(routes.keys())
+    workers
 )
 
 
@@ -175,10 +156,48 @@ worker = st.selectbox(
 # ВЫБОР ДНЯ
 # ==========================================
 
+available_days = [
+    day
+    for day in days
+    if day in df[
+        df["Мерчендайзер"] == worker
+    ]["День"].unique()
+]
+
+
+if today in available_days:
+
+    default_day_index = (
+        available_days.index(today)
+    )
+
+else:
+
+    default_day_index = 0
+
+
 day = st.selectbox(
-    "📅 День маршрута",
-    days,
-    index=days.index(today)
+    "📅 День",
+    available_days,
+    index=default_day_index
+)
+
+
+# ==========================================
+# ФИЛЬТРУЕМ МАРШРУТЫ
+# ==========================================
+
+day_data = df[
+    (df["Мерчендайзер"] == worker)
+    &
+    (df["День"] == day)
+]
+
+
+routes = sorted(
+    day_data["Маршрут"]
+    .unique()
+    .tolist()
 )
 
 
@@ -186,67 +205,105 @@ st.divider()
 
 
 # ==========================================
-# ВЫВОД МАРШРУТА
+# ИНФОРМАЦИЯ
 # ==========================================
 
-points = routes[worker][day]
-
 st.subheader(
-    f"{worker} — {day}"
+    f"👤 {worker}"
 )
 
 st.write(
-    f"Всего ТТ в маршруте: "
-    f"**{len(points)}**"
+    f"📅 **{day}**"
+)
+
+st.write(
+    f"Маршрутов на сегодня: "
+    f"**{len(routes)}**"
+)
+
+st.write(
+    f"Всего ТТ: "
+    f"**{len(day_data)}**"
 )
 
 
 # ==========================================
-# ВЫВОД ТОРГОВЫХ ТОЧЕК
+# ВЫВОД МАРШРУТОВ
 # ==========================================
 
-if len(points) == 0:
+for route in routes:
 
-    st.warning(
-        "Для этого дня пока "
-        "не удалось найти ТТ."
+    route_data = day_data[
+        day_data["Маршрут"] == route
+    ]
+
+    st.divider()
+
+    st.subheader(
+        f"🚗 {route}"
     )
 
-else:
+    st.write(
+        f"Торговых точек: "
+        f"**{len(route_data)}**"
+    )
 
-    for number, point in enumerate(
-        points,
+
+    # ======================================
+    # ТОРГОВЫЕ ТОЧКИ
+    # ======================================
+
+    for number, (
+        index,
+        point
+    ) in enumerate(
+        route_data.iterrows(),
         start=1
     ):
 
-        st.write(
-            f"**{number}. {point['shop']}**"
-        )
+        with st.expander(
 
-        st.caption(
-            f"📍 {point['address']}"
-        )
+            f"🔴 {number}. "
+            f"{point['Магазин']} — "
+            f"{point['Адрес']}",
 
-        st.divider()
+            expanded=False
+
+        ):
+
+            st.write(
+                f"🏪 **Магазин:** "
+                f"{point['Магазин']}"
+            )
+
+            st.write(
+                f"📍 **Адрес:** "
+                f"{point['Адрес']}"
+            )
 
 
 # ==========================================
-# ТЕХНИЧЕСКАЯ ИНФОРМАЦИЯ
+# ТЕХНИЧЕСКАЯ ПРОВЕРКА
 # ==========================================
 
 with st.expander(
-    "🔧 Проверка импорта"
+    "🔧 Проверка данных"
 ):
 
-    for worker_name, worker_routes in routes.items():
+    st.write(
+        f"Всего мерчендайзеров: "
+        f"{len(workers)}"
+    )
+
+    for worker_name in workers:
+
+        worker_data = df[
+            df["Мерчендайзер"]
+            == worker_name
+        ]
 
         st.write(
-            f"**{worker_name}**"
+            f"**{worker_name}: "
+            f"{len(worker_data)} ТТ**"
         )
-
-        for day_name, day_points in worker_routes.items():
-
-            st.write(
-                f"{day_name}: "
-                f"{len(day_points)} ТТ"
-            )
+```
