@@ -692,35 +692,81 @@ for route in routes:
 
             else:
 
-                visit = (
-                    completed_visits[
-                        point_key
-                    ]
-                )
+                visit = completed_visits[point_key]
 
-                st.success(
-                    "🟢 ТТ пройдена"
-                )
-
+                st.success("🟢 ТТ пройдена")
 
                 # =========================================
                 # ВРЕМЯ
                 # =========================================
 
-                if visit.get(
-                    "completed_at"
-                ):
+                if visit.get("completed_at"):
 
-                    completed_at = (
-                        visit[
-                            "completed_at"
-                        ]
+                    completed_at = visit["completed_at"]
+
+                    st.write(
+                        f"🕒 **Время:** {completed_at}"
+                    )
+
+
+                # =========================================
+                # КОММЕНТАРИЙ
+                # =========================================
+
+                if visit.get("comment"):
+
+                    st.write(
+                        "💬 **Комментарий:**"
                     )
 
                     st.write(
-                        f"🕒 **Время:** "
-                        f"{completed_at}"
+                        visit["comment"]
                     )
+
+
+                # =========================================
+                # СБРОС ТТ
+                # =========================================
+
+                st.warning(
+                    "Если ТТ была закрыта ошибочно, "
+                    "можно сбросить её прохождение."
+                )
+
+                reset = st.button(
+                    "↩️ СБРОСИТЬ ПРОХОЖДЕНИЕ ТТ",
+                    key=f"reset_{point_key}",
+                    type="secondary",
+                    use_container_width=True
+                )
+
+
+                if reset:
+
+                    try:
+
+                        supabase.table(
+                            "point_visits"
+                        ).delete().eq(
+                            "id",
+                            visit["id"]
+                        ).execute()
+
+
+                        # Очищаем сохранённые данные,
+                        # чтобы статус сразу обновился
+
+                        get_completed_visits.clear()
+
+
+                        st.rerun()
+
+
+                    except Exception as e:
+
+                        st.error(
+                            f"Ошибка сброса ТТ: {e}"
+                        )
 
 
                 # =========================================
