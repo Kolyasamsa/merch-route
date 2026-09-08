@@ -482,7 +482,39 @@ def update_visit_comment(
 
     return response.data[0]
 
+# =========================================================
+# ПОЛУЧЕНИЕ ПРОЙДЕННЫХ ТТ ЗА ПЕРИОД
+# =========================================================
 
+@st.cache_data(ttl=30)
+def get_completed_visits_for_period(
+    start_date,
+    end_date,
+):
+
+    response = (
+        supabase
+        .table("point_visits")
+        .select(
+            "worker, visit_date"
+        )
+        .gte(
+            "visit_date",
+            start_date,
+        )
+        .lte(
+            "visit_date",
+            end_date,
+        )
+        .eq(
+            "completed",
+            True,
+        )
+        .execute()
+    )
+
+    return response.data
+    
 # =========================================================
 # ОЧИСТКА КЭША
 # =========================================================
@@ -492,3 +524,5 @@ def clear_database_cache():
     get_completed_visits.clear()
 
     get_visit_photos.clear()
+
+    get_completed_visits_for_period.clear()
