@@ -134,4 +134,3 @@ st.session_state.pop(
 )
 
 st.rerun()
-```
