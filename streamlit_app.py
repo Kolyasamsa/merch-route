@@ -29,6 +29,8 @@ from database import (
     clear_database_cache,
     get_visit_comments,
     create_visit_comment,
+    get_unread_comments_for_worker,
+    mark_comment_as_read,
 )
 
 from utils import (
@@ -98,6 +100,145 @@ if user_role == "supervisor":
 # =========================================================
 
 worker = user_name
+# =========================================================
+# НОВЫЕ КОММЕНТАРИИ ОТ СУПЕРВАЙЗЕРА
+# =========================================================
+
+try:
+
+    unread_comments = (
+        get_unread_comments_for_worker(
+            worker
+        )
+    )
+
+    if unread_comments:
+
+        st.divider()
+
+        st.subheader(
+            f"🔔 Новые комментарии ({len(unread_comments)})"
+        )
+
+        st.warning(
+            "Супервайзер оставил новые комментарии "
+            "к вашим торговым точкам."
+        )
+
+        for unread_comment in unread_comments:
+
+            point_visit = (
+                unread_comment.get(
+                    "point_visits",
+                    {},
+                )
+            )
+
+            visit_date = (
+                point_visit.get(
+                    "visit_date",
+                    "",
+                )
+            )
+
+            route_name = (
+                point_visit.get(
+                    "route",
+                    "",
+                )
+            )
+
+            shop_name = (
+                point_visit.get(
+                    "shop",
+                    "",
+                )
+            )
+
+            address = (
+                point_visit.get(
+                    "address",
+                    "",
+                )
+            )
+
+            comment_text = (
+                unread_comment.get(
+                    "comment",
+                    "",
+                )
+            )
+
+            comment_id = (
+                unread_comment.get(
+                    "id"
+                )
+            )
+
+            with st.expander(
+
+                f"🔔 {shop_name} — {address}"
+
+            ):
+
+                if visit_date:
+
+                    st.write(
+                        f"📅 **Дата:** "
+                        f"{visit_date}"
+                    )
+
+                if route_name:
+
+                    st.write(
+                        f"🚗 **Маршрут:** "
+                        f"{route_name}"
+                    )
+
+                st.divider()
+
+                st.write(
+                    "👩‍💼 **Комментарий супервайзера:**"
+                )
+
+                st.write(
+                    comment_text
+                )
+
+                if st.button(
+
+                    "✓ Прочитано",
+
+                    key=(
+                        f"read_comment_"
+                        f"{comment_id}"
+                    ),
+
+                    use_container_width=True,
+                ):
+
+                    try:
+
+                        mark_comment_as_read(
+                            comment_id
+                        )
+
+                        st.rerun()
+
+                    except Exception as error:
+
+                        st.error(
+
+                            f"Ошибка: {error}"
+                        )
+
+except Exception as error:
+
+    st.warning(
+
+        f"Не удалось загрузить новые "
+        f"комментарии: {error}"
+    )
 
 # =========================================================
 # ПРОВЕРКА МЕРЧЕНДАЙЗЕРА
