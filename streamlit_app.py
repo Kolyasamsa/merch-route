@@ -1,4 +1,3 @@
-```python
 import streamlit as st
 from datetime import datetime
 
@@ -413,4 +412,3 @@ else:
         "Для этого маршрута пока "
         "не добавлены торговые точки."
     )
-```
