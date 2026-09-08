@@ -19,6 +19,7 @@ from database import (
     get_visit_photos,
     create_visit,
     upload_visit_photos,
+    replace_visit_photos,
     reset_visit,
     update_visit_comment,
     clear_database_cache,
@@ -870,61 +871,263 @@ for route in routes:
                     )
 
 
-                # -----------------------------------------
+                # =============================================
                 # ФОТОГРАФИИ
-                # -----------------------------------------
+                # =============================================
+
+                st.divider()
+
+
+                photo_edit_mode_key = (
+                    f"photo_edit_mode_{visit['id']}"
+                )
+
+
+                # Создаём состояние режима редактирования
+                if photo_edit_mode_key not in st.session_state:
+
+                    st.session_state[
+                        photo_edit_mode_key
+                    ] = False
+
 
                 try:
 
-
                     saved_photos = (
-
                         get_visit_photos(
                             visit["id"]
                         )
                     )
 
 
-                    if saved_photos:
+                    # =========================================
+                    # ОБЫЧНЫЙ РЕЖИМ
+                    # =========================================
+
+                    if not st.session_state[
+                        photo_edit_mode_key
+                    ]:
 
 
-                        st.divider()
+                        if saved_photos:
 
 
-                        st.write(
-                            "📷 **Фотографии:**"
-                        )
+                            st.write(
+                                "📷 **Фотографии:**"
+                            )
 
 
-                        columns = (
-                            st.columns(3)
-                        )
+                            columns = (
+                                st.columns(3)
+                            )
 
 
-                        for index, photo in enumerate(
-                            saved_photos
+                            for index, photo in enumerate(
+                                saved_photos
+                            ):
+
+
+                                with columns[
+                                    index % 3
+                                ]:
+
+
+                                    st.image(
+
+                                        photo["public_url"],
+
+                                        use_container_width=True,
+                                    )
+
+
+                        else:
+
+
+                            st.info(
+                                "К этой ТТ нет фотографий."
+                            )
+
+
+                        if st.button(
+
+                            "✏️ Заменить фотографии",
+
+                            key=(
+                                f"edit_photos_"
+                                f"{visit['id']}"
+                            ),
+
+                            use_container_width=True,
                         ):
 
 
-                            with columns[
-                                index % 3
-                            ]:
+                            st.session_state[
+                                photo_edit_mode_key
+                            ] = True
 
 
-                                st.image(
+                            st.rerun()
 
-                                    photo["public_url"],
 
-                                    use_container_width=True,
-                                )
-
+                    # =========================================
+                    # РЕЖИМ ЗАМЕНЫ
+                    # =========================================
 
                     else:
 
 
-                        st.info(
-                            "К этой ТТ нет фотографий."
+                        st.write(
+                            "✏️ **Замена фотографий**"
                         )
+
+
+                        if saved_photos:
+
+
+                            st.caption(
+                                "Текущие фотографии:"
+                            )
+
+
+                            columns = (
+                                st.columns(3)
+                            )
+
+
+                            for index, photo in enumerate(
+                                saved_photos
+                            ):
+
+
+                                with columns[
+                                    index % 3
+                                ]:
+
+
+                                    st.image(
+
+                                        photo["public_url"],
+
+                                        use_container_width=True,
+                                    )
+
+
+                        new_photos = (
+
+                            st.file_uploader(
+
+                                "📷 Выберите новые фотографии",
+
+                                type=[
+                                    "jpg",
+                                    "jpeg",
+                                    "png",
+                                ],
+
+                                accept_multiple_files=True,
+
+                                key=(
+                                    f"replace_photos_"
+                                    f"{visit['id']}"
+                                ),
+                            )
+                        )
+
+
+                        col_replace, col_cancel = (
+                            st.columns(2)
+                        )
+
+
+                        # =====================================
+                        # ЗАМЕНИТЬ
+                        # =====================================
+
+                        with col_replace:
+
+
+                            if st.button(
+
+                                "💾 Заменить",
+
+                                key=(
+                                    f"save_photos_"
+                                    f"{visit['id']}"
+                                ),
+
+                                use_container_width=True,
+                            ):
+
+
+                                if not new_photos:
+
+
+                                    st.warning(
+                                        "Выберите хотя бы "
+                                        "одну фотографию."
+                                    )
+
+
+                                else:
+
+
+                                    try:
+
+
+                                        replace_visit_photos(
+
+                                            new_photos,
+
+                                            visit["id"],
+                                        )
+
+
+                                        # Закрываем режим
+                                        # редактирования
+                                        st.session_state[
+                                            photo_edit_mode_key
+                                        ] = False
+
+
+                                        st.rerun()
+
+
+                                    except Exception as error:
+
+
+                                        st.error(
+
+                                            f"Ошибка замены "
+                                            f"фотографий: {error}"
+                                        )
+
+
+                        # =====================================
+                        # ОТМЕНА
+                        # =====================================
+
+                        with col_cancel:
+
+
+                            if st.button(
+
+                                "✖ Отмена",
+
+                                key=(
+                                    f"cancel_photos_"
+                                    f"{visit['id']}"
+                                ),
+
+                                use_container_width=True,
+                            ):
+
+
+                                st.session_state[
+                                    photo_edit_mode_key
+                                ] = False
+
+
+                                st.rerun()
 
 
                 except Exception as error:
@@ -935,7 +1138,6 @@ for route in routes:
                         f"Не удалось загрузить фотографии: "
                         f"{error}"
                     )
-
 
                 # -----------------------------------------
                 # СБРОС
