@@ -3,7 +3,7 @@ import streamlit as st
 def get_user_by_password(password):
 workers = st.secrets.get("workers", {})
 
-```
+
 for worker, worker_password in workers.items():
     if password == worker_password:
         return worker, "worker"
@@ -15,7 +15,7 @@ for supervisor, supervisor_password in supervisors.items():
         return supervisor, "supervisor"
 
 return None, None
-```
+
 
 def login():
 if (
@@ -27,7 +27,7 @@ st.session_state["user_name"],
 st.session_state["user_role"],
 )
 
-```
+
 st.title("📍 Маршруты мерчендайзеров")
 st.caption("Введите свой пароль")
 
@@ -58,7 +58,6 @@ if st.button(
         st.error("Неверный пароль.")
 
 return None, None
-```
 
 def logout():
 st.session_state.pop(
@@ -66,7 +65,7 @@ st.session_state.pop(
 None,
 )
 
-```
+
 st.session_state.pop(
     "user_role",
     None,
@@ -78,4 +77,3 @@ st.session_state.pop(
 )
 
 st.rerun()
-```
