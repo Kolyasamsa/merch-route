@@ -35,7 +35,6 @@ get_default_date,
 
 def show_timesheet(df):
 
-```
 st.subheader("📊 Табель прохождений")
 
 today = date.today()
