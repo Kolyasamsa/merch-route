@@ -1,7 +1,10 @@
+```python
 import uuid
 from datetime import datetime
+from io import BytesIO
 
 import streamlit as st
+from PIL import Image, ImageOps
 
 from config import (
     supabase,
@@ -95,7 +98,7 @@ def create_visit(
 
 
 # =========================================================
-# ЗАГРУЗКА ОДНОЙ ФОТОГРАФИИ
+# ЗАГРУЗКА И СЖАТИЕ ОДНОЙ ФОТОГРАФИИ
 # =========================================================
 
 def upload_visit_photo(
@@ -103,51 +106,170 @@ def upload_visit_photo(
     visit_id,
 ):
 
-    extension = (
-        uploaded_file.name
-        .rsplit(".", 1)[-1]
-        .lower()
-        if "." in uploaded_file.name
-        else "jpg"
+    # -----------------------------------------------------
+    # ОТКРЫВАЕМ ИЗОБРАЖЕНИЕ
+    # -----------------------------------------------------
+
+    image = Image.open(
+        BytesIO(
+            uploaded_file.getvalue()
+        )
     )
+
+
+    # -----------------------------------------------------
+    # ИСПРАВЛЯЕМ ОРИЕНТАЦИЮ ФОТО
+    # -----------------------------------------------------
+
+    image = ImageOps.exif_transpose(
+        image
+    )
+
+
+    # -----------------------------------------------------
+    # ПРИВОДИМ ИЗОБРАЖЕНИЕ К RGB
+    # -----------------------------------------------------
+
+    if image.mode != "RGB":
+
+        if image.mode == "RGBA":
+
+            background = Image.new(
+                "RGB",
+                image.size,
+                "white",
+            )
+
+            background.paste(
+                image,
+                mask=image.getchannel(
+                    "A"
+                ),
+            )
+
+            image = background
+
+        else:
+
+            image = image.convert(
+                "RGB"
+            )
+
+
+    # -----------------------------------------------------
+    # УМЕНЬШАЕМ РАЗМЕР
+    # -----------------------------------------------------
+
+    max_size = (
+        2560,
+        2560,
+    )
+
+
+    image.thumbnail(
+        max_size,
+        Image.Resampling.LANCZOS,
+    )
+
+
+    # -----------------------------------------------------
+    # СОХРАНЯЕМ СЖАТОЕ ФОТО В ПАМЯТЬ
+    # -----------------------------------------------------
+
+    image_buffer = BytesIO()
+
+
+    image.save(
+
+        image_buffer,
+
+        format="JPEG",
+
+        quality=85,
+
+        optimize=True,
+    )
+
+
+    image_bytes = (
+        image_buffer.getvalue()
+    )
+
+
+    # -----------------------------------------------------
+    # СОЗДАЁМ НОВОЕ ИМЯ ФАЙЛА
+    # -----------------------------------------------------
 
     file_name = (
-        f"{uuid.uuid4()}.{extension}"
+        f"{uuid.uuid4()}.jpg"
     )
 
+
     file_path = (
-        f"visits/{visit_id}/{file_name}"
+        f"visits/"
+        f"{visit_id}/"
+        f"{file_name}"
     )
+
+
+    # -----------------------------------------------------
+    # ЗАГРУЖАЕМ В SUPABASE STORAGE
+    # -----------------------------------------------------
 
     supabase.storage.from_(
         STORAGE_BUCKET
     ).upload(
+
         path=file_path,
-        file=uploaded_file.getvalue(),
+
+        file=image_bytes,
+
         file_options={
-            "content-type": uploaded_file.type,
+            "content-type": "image/jpeg",
         },
     )
+
+
+    # -----------------------------------------------------
+    # ПОЛУЧАЕМ PUBLIC URL
+    # -----------------------------------------------------
 
     public_url = (
         supabase
         .storage
-        .from_(STORAGE_BUCKET)
-        .get_public_url(file_path)
+        .from_(
+            STORAGE_BUCKET
+        )
+        .get_public_url(
+            file_path
+        )
     )
 
+
+    # -----------------------------------------------------
+    # СОХРАНЯЕМ ИНФОРМАЦИЮ О ФОТО В БАЗУ
+    # -----------------------------------------------------
+
     photo_data = {
-        "visit_id": str(visit_id),
+        "visit_id": str(
+            visit_id
+        ),
         "file_path": file_path,
         "public_url": public_url,
     }
 
+
     (
         supabase
-        .table("point_photos")
-        .insert(photo_data)
+        .table(
+            "point_photos"
+        )
+        .insert(
+            photo_data
+        )
         .execute()
     )
+
 
     return photo_data
 
@@ -179,6 +301,7 @@ def upload_visit_photos(
         )
 
     return uploaded
+
 
 # =========================================================
 # ЗАМЕНА ФОТОГРАФИЙ ТТ
@@ -251,6 +374,7 @@ def replace_visit_photos(
 
     return uploaded_photos
 
+
 # =========================================================
 # СБРОС ПРОХОЖДЕНИЯ ТТ
 # =========================================================
@@ -273,11 +397,15 @@ def reset_visit(
         or []
     )
 
+
     # Получаем пути файлов
     file_paths = [
+
         photo["file_path"]
+
         for photo in photos
     ]
+
 
     # Удаляем файлы из Storage
     if file_paths:
@@ -288,23 +416,32 @@ def reset_visit(
             file_paths
         )
 
+
     # Удаляем записи о фотографиях
     (
         supabase
         .table("point_photos")
         .delete()
-        .eq("visit_id", str(visit_id))
+        .eq(
+            "visit_id",
+            str(visit_id),
+        )
         .execute()
     )
+
 
     # Удаляем прохождение ТТ
     (
         supabase
         .table("point_visits")
         .delete()
-        .eq("id", str(visit_id))
+        .eq(
+            "id",
+            str(visit_id),
+        )
         .execute()
     )
+
 
     clear_database_cache()
 
@@ -333,13 +470,16 @@ def update_visit_comment(
         .execute()
     )
 
+
     if not response.data:
 
         raise RuntimeError(
             "Комментарий не был обновлён."
         )
 
+
     clear_database_cache()
+
 
     return response.data[0]
 
@@ -353,3 +493,4 @@ def clear_database_cache():
     get_completed_visits.clear()
 
     get_visit_photos.clear()
+```
