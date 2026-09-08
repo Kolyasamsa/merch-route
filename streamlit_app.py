@@ -8,7 +8,7 @@ from supabase import create_client
 
 
 # =========================================================
-# НАСТРОЙКИ
+# НАСТРОЙКИ ПРИЛОЖЕНИЯ
 # =========================================================
 
 st.set_page_config(
@@ -64,6 +64,7 @@ def load_routes():
     for column in required_columns:
 
         if column not in df.columns:
+
             raise ValueError(
                 f"В Excel отсутствует столбец: {column}"
             )
@@ -83,19 +84,24 @@ def load_routes():
 # =========================================================
 
 try:
+
     df = load_routes()
 
 except Exception as e:
+
     st.error(
         f"Ошибка чтения Excel: {e}"
     )
+
     st.stop()
 
 
 if df is None:
+
     st.error(
         f"Файл {EXCEL_FILE} не найден."
     )
+
     st.stop()
 
 
@@ -173,23 +179,37 @@ def save_visit(
 ):
 
     data = {
+
         "visit_date": selected_date_string,
+
         "worker": worker,
+
         "weekday": day,
+
         "route": route,
+
         "shop": shop,
+
         "address": address,
+
         "completed": True,
+
         "comment": comment,
+
         "completed_at": datetime.now().isoformat()
+
     }
 
+
     response = (
+
         supabase
         .table("point_visits")
         .insert(data)
         .execute()
+
     )
+
 
     return response.data
 
@@ -206,49 +226,94 @@ def upload_photos(
 
     uploaded_files = []
 
+
     if not files:
+
         return uploaded_files
+
+
+    # -----------------------------------------------------
+    # Безопасное имя папки
+    #
+    # Кириллица превращается в набор латинских символов
+    # и цифр, поэтому Supabase принимает путь.
+    # -----------------------------------------------------
+
+    safe_worker = (
+        worker
+        .encode("utf-8")
+        .hex()
+    )
+
 
     for file in files:
 
-        # Расширение файла
-        file_extension = (
-            file.name
-            .split(".")[-1]
-        )
 
-        # Уникальное имя
+        # -------------------------------------------------
+        # Получаем расширение файла
+        # -------------------------------------------------
+
+        if "." in file.name:
+
+            file_extension = (
+                file.name
+                .rsplit(".", 1)[-1]
+                .lower()
+            )
+
+        else:
+
+            file_extension = "jpg"
+
+
+        # -------------------------------------------------
+        # Уникальное имя файла
+        # -------------------------------------------------
+
         file_name = (
-            f"{uuid.uuid4()}."
-            f"{file_extension}"
+            f"{uuid.uuid4()}.{file_extension}"
         )
 
-        # Безопасное имя папки
-        safe_worker = (
-            worker
-            .replace(" ", "_")
-        )
 
-        # Путь к фото
+        # -------------------------------------------------
+        # Путь к файлу
+        # -------------------------------------------------
+
         file_path = (
             f"{selected_date_string}/"
             f"{safe_worker}/"
             f"{file_name}"
         )
 
-        # Загружаем файл
+
+        # -------------------------------------------------
+        # ЗАГРУЗКА В STORAGE
+        # -------------------------------------------------
+
         supabase.storage.from_(
             "point-photos"
         ).upload(
+
             path=file_path,
+
             file=file.getvalue(),
+
             file_options={
-                "content-type": file.type
+
+                "content-type":
+                    file.type
+
             }
+
         )
 
-        # Получаем публичную ссылку
+
+        # -------------------------------------------------
+        # ПОЛУЧАЕМ ПУБЛИЧНУЮ ССЫЛКУ
+        # -------------------------------------------------
+
         public_url = (
+
             supabase
             .storage
             .from_(
@@ -257,11 +322,14 @@ def upload_photos(
             .get_public_url(
                 file_path
             )
+
         )
+
 
         uploaded_files.append(
             public_url
         )
+
 
     return uploaded_files
 
@@ -272,9 +340,15 @@ def upload_photos(
 
 weekday_number = datetime.today().weekday()
 
+
 if weekday_number < 5:
-    today_day = DAYS[weekday_number]
+
+    today_day = DAYS[
+        weekday_number
+    ]
+
 else:
+
     today_day = "Понедельник"
 
 
@@ -301,6 +375,7 @@ workers = sorted(
     .tolist()
 )
 
+
 worker = st.selectbox(
     "👤 Мерчендайзер",
     workers
@@ -315,21 +390,30 @@ worker_data = df[
     df["Мерчендайзер"] == worker
 ]
 
+
 available_days = [
+
     day
+
     for day in DAYS
+
     if day in worker_data[
         "День"
     ].unique()
+
 ]
 
+
 if today_day in available_days:
+
     default_day_index = (
         available_days.index(
             today_day
         )
     )
+
 else:
+
     default_day_index = 0
 
 
@@ -350,6 +434,7 @@ selected_date = st.date_input(
     format="DD.MM.YYYY"
 )
 
+
 selected_date_string = (
     selected_date.strftime(
         "%Y-%m-%d"
@@ -364,6 +449,7 @@ selected_date_string = (
 day_data = worker_data[
     worker_data["День"] == day
 ].copy()
+
 
 routes = (
     day_data[
@@ -391,21 +477,30 @@ visits = get_completed_visits(
 
 completed_visits = {}
 
+
 for visit in visits:
 
+
     key = get_point_key(
+
         visit["worker"],
+
         visit["weekday"],
+
         visit["route"],
+
         visit["shop"],
+
         visit["address"]
+
     )
+
 
     completed_visits[key] = visit
 
 
 # =========================================================
-# ИНФОРМАЦИЯ
+# ИНФОРМАЦИЯ О МАРШРУТЕ
 # =========================================================
 
 st.divider()
@@ -434,13 +529,16 @@ st.write(
 
 for route in routes:
 
+
     route_data = day_data[
         day_data["Маршрут"] == route
     ]
 
+
     total_points = len(
         route_data
     )
+
 
     completed_count = 0
 
@@ -452,20 +550,34 @@ for route in routes:
     for _, point in route_data.iterrows():
 
         point_key = get_point_key(
+
             worker,
+
             day,
+
             route,
+
             point["Магазин"],
+
             point["Адрес"]
+
         )
 
+
         if point_key in completed_visits:
+
             completed_count += 1
 
 
+    # =====================================================
+    # ПРОГРЕСС
+    # =====================================================
+
     progress = 0
 
+
     if total_points > 0:
+
         progress = (
             completed_count
             / total_points
@@ -486,18 +598,22 @@ for route in routes:
         progress
     )
 
+
     col1, col2, col3 = st.columns(3)
+
 
     col1.metric(
         "Пройдено",
         completed_count
     )
 
+
     col2.metric(
         "Осталось",
         total_points
         - completed_count
     )
+
 
     col3.metric(
         "Всего",
@@ -513,9 +629,13 @@ for route in routes:
         _,
         point
     ) in enumerate(
+
         route_data.iterrows(),
+
         start=1
+
     ):
+
 
         shop = point[
             "Магазин"
@@ -525,13 +645,21 @@ for route in routes:
             "Адрес"
         ]
 
+
         point_key = get_point_key(
+
             worker,
+
             day,
+
             route,
+
             shop,
+
             address
+
         )
+
 
         is_completed = (
             point_key
@@ -544,15 +672,20 @@ for route in routes:
         # =================================================
 
         if is_completed:
+
             status = "🟢"
+
             status_text = "Пройдена"
+
         else:
+
             status = "🔴"
+
             status_text = "Не пройдена"
 
 
         # =================================================
-        # ТТ
+        # БЛОК ТТ
         # =================================================
 
         with st.expander(
@@ -585,7 +718,7 @@ for route in routes:
 
 
                 # =========================================
-                # ФОТО
+                # ЗАГРУЗКА ФОТО
                 # =========================================
 
                 photos = st.file_uploader(
@@ -604,6 +737,7 @@ for route in routes:
                         f"photos_"
                         f"{point_key}"
                     )
+
                 )
 
 
@@ -625,6 +759,7 @@ for route in routes:
                         f"comment_"
                         f"{point_key}"
                     )
+
                 )
 
 
@@ -642,43 +777,70 @@ for route in routes:
                     ),
 
                     type="primary"
+
                 ):
+
 
                     try:
 
-                        # Сохраняем ТТ
+
+                        # ---------------------------------
+                        # Сохраняем ТТ в базу
+                        # ---------------------------------
+
                         save_visit(
+
                             selected_date_string,
+
                             worker,
+
                             day,
+
                             route,
+
                             shop,
+
                             address,
+
                             comment
+
                         )
 
 
+                        # ---------------------------------
                         # Загружаем фото
+                        # ---------------------------------
+
                         if photos:
 
                             upload_photos(
+
                                 photos,
+
                                 selected_date_string,
+
                                 worker
+
                             )
 
 
+                        # ---------------------------------
                         # Очищаем кэш
+                        # ---------------------------------
+
                         get_completed_visits.clear()
+
 
                         st.success(
                             "ТТ сохранена!"
                         )
 
+
                         st.rerun()
 
 
                     except Exception as e:
+
 
                         st.error(
                             f"Ошибка сохранения: "
@@ -692,11 +854,13 @@ for route in routes:
 
             else:
 
+
                 visit = (
                     completed_visits[
                         point_key
                     ]
                 )
+
 
                 st.success(
                     "🟢 ТТ пройдена"
@@ -704,18 +868,20 @@ for route in routes:
 
 
                 # =========================================
-                # ВРЕМЯ
+                # ВРЕМЯ ПРОХОЖДЕНИЯ
                 # =========================================
 
                 if visit.get(
                     "completed_at"
                 ):
 
+
                     completed_at = (
                         visit[
                             "completed_at"
                         ]
                     )
+
 
                     st.write(
                         f"🕒 **Время:** "
@@ -731,9 +897,11 @@ for route in routes:
                     "comment"
                 ):
 
+
                     st.write(
                         "💬 **Комментарий:**"
                     )
+
 
                     st.write(
                         visit[
@@ -743,10 +911,17 @@ for route in routes:
 
 
                 # =========================================
-                # СБРОС ТТ
+                # СБРОС ПРОХОЖДЕНИЯ
                 # =========================================
 
                 st.divider()
+
+
+                st.warning(
+                    "Если ТТ была закрыта ошибочно, "
+                    "можно сбросить её прохождение."
+                )
+
 
                 if st.button(
 
@@ -755,14 +930,19 @@ for route in routes:
                     key=(
                         f"reset_"
                         f"{point_key}"
-                    )
+                    ),
+
+                    type="secondary",
+
+                    use_container_width=True
 
                 ):
 
+
                     try:
 
-                        # Удаляем запись
-                        # именно этой ТТ
+
+                        # Удаляем запись ТТ из базы
 
                         (
                             supabase
@@ -793,6 +973,7 @@ for route in routes:
 
                     except Exception as e:
 
+
                         st.error(
                             f"Ошибка сброса ТТ: "
                             f"{e}"
@@ -809,29 +990,44 @@ st.subheader(
     "📊 Общий прогресс"
 )
 
+
 total_points = len(
     day_data
 )
+
 
 completed_points = 0
 
 
 for _, point in day_data.iterrows():
 
+
     point_key = get_point_key(
+
         worker,
+
         day,
+
         point["Маршрут"],
+
         point["Магазин"],
+
         point["Адрес"]
+
     )
+
 
     if (
         point_key
         in completed_visits
     ):
+
         completed_points += 1
 
+
+# =========================================================
+# ПРОГРЕСС-БАР
+# =========================================================
 
 if total_points > 0:
 
@@ -841,17 +1037,24 @@ if total_points > 0:
     )
 
 
+# =========================================================
+# СТАТИСТИКА
+# =========================================================
+
 col1, col2, col3 = st.columns(3)
+
 
 col1.metric(
     "Всего ТТ",
     total_points
 )
 
+
 col2.metric(
     "Пройдено",
     completed_points
 )
+
 
 col3.metric(
     "Осталось",
