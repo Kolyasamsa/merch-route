@@ -1,24 +1,13 @@
 import streamlit as st
 
-# =========================================================
-
-# ПОИСК ПОЛЬЗОВАТЕЛЯ ПО ПАРОЛЮ
-
-# =========================================================
-
-def get_user_by_password(
-password,
-):
+def get_user_by_password(password):
 """
 Ищет пользователя по паролю.
 
 ```
 Возвращает:
-    (имя, роль)
-
-Возможные роли:
-    worker
-    supervisor
+    имя пользователя
+    роль пользователя
 """
 
 workers = st.secrets.get(
@@ -30,11 +19,7 @@ for worker, worker_password in workers.items():
 
     if password == worker_password:
 
-        return (
-            worker,
-            "worker",
-        )
-
+        return worker, "worker"
 
 supervisors = st.secrets.get(
     "supervisors",
@@ -45,39 +30,20 @@ for supervisor, supervisor_password in supervisors.items():
 
     if password == supervisor_password:
 
-        return (
-            supervisor,
-            "supervisor",
-        )
+        return supervisor, "supervisor"
 
-
-return (
-    None,
-    None,
-)
+return None, None
 ```
-
-# =========================================================
-
-# ВХОД
-
-# =========================================================
 
 def login():
 """
-Показывает экран входа.
+Авторизация пользователя.
 
 ```
-После успешной авторизации возвращает:
-
-    имя пользователя,
-    роль пользователя
+Возвращает:
+    user_name
+    user_role
 """
-
-# -----------------------------------------------------
-# ПРОВЕРЯЕМ,
-# АВТОРИЗОВАН ЛИ ПОЛЬЗОВАТЕЛЬ
-# -----------------------------------------------------
 
 if (
     "user_name" in st.session_state
@@ -85,50 +51,29 @@ if (
 ):
 
     return (
-
-        st.session_state[
-            "user_name"
-        ],
-
-        st.session_state[
-            "user_role"
-        ],
+        st.session_state["user_name"],
+        st.session_state["user_role"],
     )
-
-
-# -----------------------------------------------------
-# ЭКРАН ВХОДА
-# -----------------------------------------------------
 
 st.title(
     "📍 Маршруты мерчендайзеров"
 )
 
-
 st.caption(
     "Введите свой пароль"
 )
 
-
 password = st.text_input(
-
     "🔐 Пароль",
-
     type="password",
-
     key="login_password",
 )
 
-
 if st.button(
-
     "Войти",
-
     type="primary",
-
     use_container_width=True,
 ):
-
 
     if not password:
 
@@ -136,43 +81,25 @@ if st.button(
             "Введите пароль."
         )
 
-        return (
-            None,
-            None,
-        )
-
+        return None, None
 
     user_name, user_role = (
-
         get_user_by_password(
             password
         )
     )
 
-
-    # -------------------------------------------------
-    # УСПЕШНЫЙ ВХОД
-    # -------------------------------------------------
-
     if user_name:
-
 
         st.session_state[
             "user_name"
         ] = user_name
 
-
         st.session_state[
             "user_role"
         ] = user_role
 
-
         st.rerun()
-
-
-    # -------------------------------------------------
-    # НЕВЕРНЫЙ ПАРОЛЬ
-    # -------------------------------------------------
 
     else:
 
@@ -180,18 +107,8 @@ if st.button(
             "Неверный пароль."
         )
 
-
-return (
-    None,
-    None,
-)
+return None, None
 ```
-
-# =========================================================
-
-# ВЫХОД
-
-# =========================================================
 
 def logout():
 """
@@ -204,20 +121,17 @@ st.session_state.pop(
     None,
 )
 
-
 st.session_state.pop(
     "user_role",
     None,
 )
 
-
-# На всякий случай удаляем
-# старую авторизацию мерчендайзера
+# Удаляем старый ключ,
+# если он остался от предыдущей версии
 st.session_state.pop(
     "worker",
     None,
 )
-
 
 st.rerun()
 ```
