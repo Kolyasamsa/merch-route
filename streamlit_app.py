@@ -2,10 +2,13 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime, date
 import os
+import uuid
+
+from supabase import create_client
 
 
 # =========================================================
-# НАСТРОЙКИ СТРАНИЦЫ
+# НАСТРОЙКИ
 # =========================================================
 
 st.set_page_config(
@@ -14,10 +17,6 @@ st.set_page_config(
     layout="wide"
 )
 
-
-# =========================================================
-# НАСТРОЙКИ
-# =========================================================
 
 EXCEL_FILE = "routes.xlsx"
 
@@ -31,20 +30,16 @@ DAYS = [
 
 
 # =========================================================
-# СОСТОЯНИЕ ПРИЛОЖЕНИЯ
+# ПОДКЛЮЧЕНИЕ К SUPABASE
 # =========================================================
 
-if "completed_points" not in st.session_state:
-    st.session_state.completed_points = {}
+SUPABASE_URL = st.secrets["SUPABASE_URL"]
+SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
 
-if "point_comments" not in st.session_state:
-    st.session_state.point_comments = {}
-
-if "point_photos" not in st.session_state:
-    st.session_state.point_photos = {}
-
-if "completion_times" not in st.session_state:
-    st.session_state.completion_times = {}
+supabase = create_client(
+    SUPABASE_URL,
+    SUPABASE_KEY
+)
 
 
 # =========================================================
@@ -70,8 +65,9 @@ def load_routes():
     for column in required_columns:
 
         if column not in df.columns:
+
             raise ValueError(
-                f"В Excel нет столбца: {column}"
+                f"В Excel отсутствует столбец: {column}"
             )
 
         df[column] = (
@@ -80,11 +76,6 @@ def load_routes():
             .astype(str)
             .str.strip()
         )
-
-    # Убираем полностью пустые строки
-    df = df[
-        df["Мерчендайзер"] != ""
-    ]
 
     return df
 
@@ -100,7 +91,7 @@ try:
 except Exception as e:
 
     st.error(
-        f"Ошибка при чтении Excel: {e}"
+        f"Ошибка чтения Excel: {e}"
     )
 
     st.stop()
@@ -116,6 +107,65 @@ if df is None:
 
 
 # =========================================================
+# ПОЛУЧЕНИЕ ПРОЙДЕННЫХ ТТ ИЗ SUPABASE
+# =========================================================
+
+@st.cache_data(ttl=10)
+def get_completed_visits(
+    selected_date_string,
+    worker
+):
+
+    try:
+
+        response = (
+            supabase
+            .table("point_visits")
+            .select("*")
+            .eq(
+                "visit_date",
+                selected_date_string
+            )
+            .eq(
+                "worker",
+                worker
+            )
+            .execute()
+        )
+
+        return response.data
+
+    except Exception as e:
+
+        st.error(
+            f"Ошибка загрузки данных: {e}"
+        )
+
+        return []
+
+
+# =========================================================
+# СОЗДАНИЕ УНИКАЛЬНОГО КЛЮЧА ТТ
+# =========================================================
+
+def get_point_key(
+    worker,
+    day,
+    route,
+    shop,
+    address
+):
+
+    return (
+        f"{worker}|"
+        f"{day}|"
+        f"{route}|"
+        f"{shop}|"
+        f"{address}"
+    )
+
+
+# =========================================================
 # ОПРЕДЕЛЯЕМ ТЕКУЩИЙ ДЕНЬ
 # =========================================================
 
@@ -123,7 +173,9 @@ weekday_number = datetime.today().weekday()
 
 if weekday_number < 5:
 
-    today_day = DAYS[weekday_number]
+    today_day = DAYS[
+        weekday_number
+    ]
 
 else:
 
@@ -134,7 +186,9 @@ else:
 # ЗАГОЛОВОК
 # =========================================================
 
-st.title("📍 Маршруты мерчендайзеров")
+st.title(
+    "📍 Маршруты мерчендайзеров"
+)
 
 st.caption(
     "Контроль прохождения торговых точек"
@@ -147,7 +201,6 @@ st.caption(
 
 workers = sorted(
     df["Мерчендайзер"]
-    .dropna()
     .unique()
     .tolist()
 )
@@ -160,7 +213,7 @@ worker = st.selectbox(
 
 
 # =========================================================
-# ДОСТУПНЫЕ ДНИ ДЛЯ ЭТОГО МЕРЧЕНДАЙЗЕРА
+# ДОСТУПНЫЕ ДНИ
 # =========================================================
 
 worker_data = df[
@@ -169,16 +222,24 @@ worker_data = df[
 
 
 available_days = [
+
     day
+
     for day in DAYS
-    if day in worker_data["День"].unique()
+
+    if day in worker_data[
+        "День"
+    ].unique()
+
 ]
 
 
 if today_day in available_days:
 
-    default_day_index = available_days.index(
-        today_day
+    default_day_index = (
+        available_days.index(
+            today_day
+        )
     )
 
 else:
@@ -194,10 +255,7 @@ day = st.selectbox(
 
 
 # =========================================================
-# ДАТА ПРОХОЖДЕНИЯ
-#
-# Она нужна, чтобы каждый новый вторник
-# создавал отдельный отчёт.
+# ВЫБОР ДАТЫ
 # =========================================================
 
 selected_date = st.date_input(
@@ -207,13 +265,15 @@ selected_date = st.date_input(
 )
 
 
-date_key = selected_date.strftime(
-    "%Y-%m-%d"
+selected_date_string = (
+    selected_date.strftime(
+        "%Y-%m-%d"
+    )
 )
 
 
 # =========================================================
-# ФИЛЬТРУЕМ ТЕКУЩИЙ ДЕНЬ
+# ФИЛЬТРУЕМ ТТ
 # =========================================================
 
 day_data = worker_data[
@@ -222,7 +282,9 @@ day_data = worker_data[
 
 
 routes = (
-    day_data["Маршрут"]
+    day_data[
+        "Маршрут"
+    ]
     .dropna()
     .unique()
     .tolist()
@@ -230,7 +292,211 @@ routes = (
 
 
 # =========================================================
-# ИНФОРМАЦИЯ О МАРШРУТЕ
+# ЗАГРУЖАЕМ СОХРАНЁННЫЕ ТТ
+# =========================================================
+
+visits = get_completed_visits(
+    selected_date_string,
+    worker
+)
+
+
+# Создаём словарь для быстрого поиска
+
+completed_visits = {}
+
+for visit in visits:
+
+    key = get_point_key(
+
+        visit["worker"],
+
+        visit["weekday"],
+
+        visit["route"],
+
+        visit["shop"],
+
+        visit["address"]
+
+    )
+
+    completed_visits[key] = visit
+
+
+# =========================================================
+# СОХРАНЕНИЕ ТТ В SUPABASE
+# =========================================================
+
+def save_visit(
+    selected_date_string,
+    worker,
+    day,
+    route,
+    shop,
+    address,
+    comment
+):
+
+    data = {
+
+        "visit_date":
+            selected_date_string,
+
+        "worker":
+            worker,
+
+        "weekday":
+            day,
+
+        "route":
+            route,
+
+        "shop":
+            shop,
+
+        "address":
+            address,
+
+        "completed":
+            True,
+
+        "comment":
+            comment,
+
+        "completed_at":
+            datetime.now().isoformat()
+
+    }
+
+
+    response = (
+
+        supabase
+        .table("point_visits")
+        .insert(data)
+        .execute()
+
+    )
+
+
+    return response.data
+
+
+# =========================================================
+# ЗАГРУЗКА ФОТО В SUPABASE STORAGE
+# =========================================================
+
+def upload_photos(
+    files,
+    selected_date_string,
+    worker,
+    route,
+    shop,
+    address
+):
+
+    uploaded_files = []
+
+
+    if not files:
+
+        return uploaded_files
+
+
+    for file in files:
+
+        # Получаем расширение
+
+        file_extension = (
+            file.name
+            .split(".")[-1]
+        )
+
+
+        # Создаём уникальное имя
+
+        file_name = (
+            f"{uuid.uuid4()}."
+            f"{file_extension}"
+        )
+
+
+        # Создаём папку
+
+        safe_worker = (
+            worker
+            .replace(" ", "_")
+        )
+
+
+        file_path = (
+
+            f"{selected_date_string}/"
+
+            f"{safe_worker}/"
+
+            f"{file_name}"
+
+        )
+
+
+        # Загружаем
+
+        supabase.storage.from_(
+            "point-photos"
+        ).upload(
+
+            path=file_path,
+
+            file=file.getvalue(),
+
+            file_options={
+
+                "content-type":
+                    file.type
+
+            }
+
+        )
+
+
+        # Получаем публичную ссылку
+
+        public_url = (
+
+            supabase
+            .storage
+            .from_(
+                "point-photos"
+            )
+            .get_public_url(
+                file_path
+            )
+
+        )
+
+
+        uploaded_files.append(
+            public_url
+        )
+
+
+    return uploaded_files
+
+
+# =========================================================
+# СОХРАНЕНИЕ СПИСКА ФОТО
+#
+# В этой первой версии ссылки на фото
+# пока хранятся в комментарии не будут.
+# На следующем этапе создадим отдельную
+# таблицу point_photos.
+# =========================================================
+
+
+# =========================================================
+# ИНФОРМАЦИЯ
 # =========================================================
 
 st.divider()
@@ -254,23 +520,7 @@ st.write(
 
 
 # =========================================================
-# СОЗДАНИЕ УНИКАЛЬНОГО ID ТТ
-# =========================================================
-
-def get_point_id(point):
-
-    return (
-        f"{date_key}|"
-        f"{worker}|"
-        f"{day}|"
-        f"{point['Маршрут']}|"
-        f"{point['Магазин']}|"
-        f"{point['Адрес']}"
-    )
-
-
-# =========================================================
-# ВЫВОД МАРШРУТОВ
+# МАРШРУТЫ
 # =========================================================
 
 for route in routes:
@@ -279,40 +529,39 @@ for route in routes:
         day_data["Маршрут"] == route
     ]
 
-    total_points = len(route_data)
+
+    # =====================================================
+    # ПРОГРЕСС МАРШРУТА
+    # =====================================================
+
+    total_points = len(
+        route_data
+    )
 
     completed_count = 0
 
 
-    # Сначала считаем прогресс
     for _, point in route_data.iterrows():
 
-        point_id = get_point_id(
-            point
+        point_key = get_point_key(
+
+            worker,
+
+            day,
+
+            route,
+
+            point["Магазин"],
+
+            point["Адрес"]
+
         )
 
-        if (
-            point_id
-            in st.session_state.completed_points
-        ):
+
+        if point_key in completed_visits:
 
             completed_count += 1
 
-
-    # =====================================================
-    # ЗАГОЛОВОК МАРШРУТА
-    # =====================================================
-
-    st.divider()
-
-    st.subheader(
-        f"🚗 {route}"
-    )
-
-
-    # =====================================================
-    # ПРОГРЕСС
-    # =====================================================
 
     progress = 0
 
@@ -324,30 +573,37 @@ for route in routes:
         )
 
 
-    st.progress(progress)
+    # =====================================================
+    # ЗАГОЛОВОК
+    # =====================================================
+
+    st.divider()
+
+    st.subheader(
+        f"🚗 {route}"
+    )
+
+    st.progress(
+        progress
+    )
 
     col1, col2, col3 = st.columns(3)
 
-    with col1:
+    col1.metric(
+        "Пройдено",
+        completed_count
+    )
 
-        st.metric(
-            "Пройдено",
-            completed_count
-        )
+    col2.metric(
+        "Осталось",
+        total_points
+        - completed_count
+    )
 
-    with col2:
-
-        st.metric(
-            "Осталось",
-            total_points - completed_count
-        )
-
-    with col3:
-
-        st.metric(
-            "Всего ТТ",
-            total_points
-        )
+    col3.metric(
+        "Всего",
+        total_points
+    )
 
 
     # =====================================================
@@ -355,75 +611,90 @@ for route in routes:
     # =====================================================
 
     for number, (
-        index,
+        _,
         point
     ) in enumerate(
+
         route_data.iterrows(),
+
         start=1
+
     ):
 
-        point_id = get_point_id(
-            point
+
+        shop = point[
+            "Магазин"
+        ]
+
+        address = point[
+            "Адрес"
+        ]
+
+
+        point_key = get_point_key(
+
+            worker,
+
+            day,
+
+            route,
+
+            shop,
+
+            address
+
         )
 
 
-        # Проверяем статус
         is_completed = (
-            point_id
-            in st.session_state.completed_points
+            point_key
+            in completed_visits
         )
 
 
         if is_completed:
 
             status = "🟢"
-
             status_text = "Пройдена"
 
         else:
 
             status = "🔴"
-
             status_text = "Не пройдена"
 
 
         # =================================================
-        # БЛОК ТТ
+        # ОКНО ТТ
         # =================================================
 
         with st.expander(
 
             f"{status} "
             f"{number}. "
-            f"{point['Магазин']} — "
-            f"{point['Адрес']} "
-            f"({status_text})",
-
-            expanded=False
+            f"{shop} — "
+            f"{address} "
+            f"({status_text})"
 
         ):
 
+
             st.write(
                 f"🏪 **Магазин:** "
-                f"{point['Магазин']}"
+                f"{shop}"
             )
 
             st.write(
                 f"📍 **Адрес:** "
-                f"{point['Адрес']}"
+                f"{address}"
             )
 
 
             # =============================================
-            # ЕСЛИ ТТ ЕЩЁ НЕ ПРОЙДЕНА
+            # ЕСЛИ НЕ ПРОЙДЕНА
             # =============================================
 
             if not is_completed:
 
-
-                # -----------------------------------------
-                # ФОТО
-                # -----------------------------------------
 
                 photos = st.file_uploader(
 
@@ -437,30 +708,13 @@ for route in routes:
 
                     accept_multiple_files=True,
 
-                    key=f"photos_{point_id}"
+                    key=(
+                        f"photos_"
+                        f"{point_key}"
+                    )
+
                 )
 
-
-                if photos:
-
-                    st.info(
-                        f"📷 Выбрано фотографий: "
-                        f"{len(photos)}"
-                    )
-
-
-                    # Предварительный просмотр
-                    preview_photos = photos[:4]
-
-                    st.image(
-                        preview_photos,
-                        width=200
-                    )
-
-
-                # -----------------------------------------
-                # КОММЕНТАРИЙ
-                # -----------------------------------------
 
                 comment = st.text_area(
 
@@ -472,138 +726,148 @@ for route in routes:
                         "причина отсутствия..."
                     ),
 
-                    key=f"comment_{point_id}"
+                    key=(
+                        f"comment_"
+                        f"{point_key}"
+                    )
+
                 )
 
-
-                # -----------------------------------------
-                # КНОПКА ЗАВЕРШЕНИЯ
-                # -----------------------------------------
 
                 if st.button(
 
                     "✓ ЗАВЕРШИТЬ ТТ",
 
-                    key=f"complete_{point_id}",
+                    key=(
+                        f"complete_"
+                        f"{point_key}"
+                    ),
 
                     type="primary"
 
                 ):
 
 
-                    # Сохраняем статус
-                    st.session_state.completed_points[
-                        point_id
-                    ] = True
+                    try:
 
 
-                    # Сохраняем комментарий
-                    st.session_state.point_comments[
-                        point_id
-                    ] = comment
+                        # Сохраняем ТТ
+
+                        save_visit(
+
+                            selected_date_string,
+
+                            worker,
+
+                            day,
+
+                            route,
+
+                            shop,
+
+                            address,
+
+                            comment
+
+                        )
 
 
-                    # Сохраняем время
-                    st.session_state.completion_times[
-                        point_id
-                    ] = datetime.now().strftime(
-                        "%d.%m.%Y %H:%M"
-                    )
+                        # Загружаем фото
+
+                        if photos:
+
+                            upload_photos(
+
+                                photos,
+
+                                selected_date_string,
+
+                                worker,
+
+                                route,
+
+                                shop,
+
+                                address
+
+                            )
 
 
-                    # Пока фото сохраняются
-                    # только в памяти приложения.
-                    st.session_state.point_photos[
-                        point_id
-                    ] = photos
+                        # Очищаем кэш,
+                        # чтобы загрузить свежие данные
+
+                        get_completed_visits.clear()
 
 
-                    st.success(
-                        "ТТ успешно завершена!"
-                    )
+                        st.success(
+                            "ТТ сохранена!"
+                        )
 
 
-                    st.rerun()
+                        st.rerun()
+
+
+                    except Exception as e:
+
+
+                        st.error(
+                            f"Ошибка сохранения: "
+                            f"{e}"
+                        )
 
 
             # =============================================
-            # ЕСЛИ ТТ УЖЕ ПРОЙДЕНА
+            # ЕСЛИ ПРОЙДЕНА
             # =============================================
 
             else:
+
+
+                visit = (
+                    completed_visits[
+                        point_key
+                    ]
+                )
+
 
                 st.success(
                     "🟢 ТТ пройдена"
                 )
 
 
-                # Время
-                if (
-                    point_id
-                    in st.session_state.completion_times
+                if visit.get(
+                    "completed_at"
+                ):
+
+                    completed_at = (
+                        visit[
+                            "completed_at"
+                        ]
+                    )
+
+                    st.write(
+                        f"🕒 **Время:** "
+                        f"{completed_at}"
+                    )
+
+
+                if visit.get(
+                    "comment"
                 ):
 
                     st.write(
-                        "🕒 **Время завершения:** "
-                        + st.session_state.completion_times[
-                            point_id
-                        ]
+                        "💬 **Комментарий:**"
                     )
 
-
-                # Комментарий
-                if (
-                    point_id
-                    in st.session_state.point_comments
-                ):
-
-                    saved_comment = (
-                        st.session_state.point_comments[
-                            point_id
+                    st.write(
+                        visit[
+                            "comment"
                         ]
                     )
-
-
-                    if saved_comment:
-
-                        st.write(
-                            "💬 **Комментарий:**"
-                        )
-
-                        st.write(
-                            saved_comment
-                        )
-
-
-                # Фото
-                if (
-                    point_id
-                    in st.session_state.point_photos
-                ):
-
-                    saved_photos = (
-                        st.session_state.point_photos[
-                            point_id
-                        ]
-                    )
-
-
-                    if saved_photos:
-
-                        st.write(
-                            f"📷 **Фотографий:** "
-                            f"{len(saved_photos)}"
-                        )
-
-
-                        st.image(
-                            saved_photos,
-                            width=200
-                        )
 
 
 # =========================================================
-# ОБЩАЯ СТАТИСТИКА ЗА ВЫБРАННЫЙ ДЕНЬ
+# ОБЩИЙ ПРОГРЕСС
 # =========================================================
 
 st.divider()
@@ -613,85 +877,66 @@ st.subheader(
 )
 
 
-total_day_points = len(day_data)
+total_points = len(
+    day_data
+)
 
-completed_day_points = 0
+completed_points = 0
 
 
 for _, point in day_data.iterrows():
 
-    point_id = get_point_id(
-        point
+    point_key = get_point_key(
+
+        worker,
+
+        day,
+
+        point[
+            "Маршрут"
+        ],
+
+        point[
+            "Магазин"
+        ],
+
+        point[
+            "Адрес"
+        ]
+
     )
+
 
     if (
-        point_id
-        in st.session_state.completed_points
+        point_key
+        in completed_visits
     ):
 
-        completed_day_points += 1
+        completed_points += 1
 
 
-if total_day_points > 0:
-
-    total_progress = (
-        completed_day_points
-        / total_day_points
-    )
+if total_points > 0:
 
     st.progress(
-        total_progress
+        completed_points
+        / total_points
     )
 
 
 col1, col2, col3 = st.columns(3)
 
-with col1:
+col1.metric(
+    "Всего ТТ",
+    total_points
+)
 
-    st.metric(
-        "Всего ТТ",
-        total_day_points
-    )
+col2.metric(
+    "Пройдено",
+    completed_points
+)
 
-with col2:
-
-    st.metric(
-        "Пройдено",
-        completed_day_points
-    )
-
-with col3:
-
-    st.metric(
-        "Осталось",
-        total_day_points
-        - completed_day_points
-    )
-
-
-# =========================================================
-# ТЕСТОВАЯ ТЕХНИЧЕСКАЯ ИНФОРМАЦИЯ
-# =========================================================
-
-with st.expander(
-    "🔧 Техническая информация"
-):
-
-    st.write(
-        f"Дата отчёта: {date_key}"
-    )
-
-    st.write(
-        f"Всего мерчендайзеров: "
-        f"{len(workers)}"
-    )
-
-    st.write(
-        "Эта версия пока работает "
-        "в тестовом режиме."
-    )
-
-    st.write(
-        "После перезапуска сервера "
-        "статусы и фотографии могут исчезнуть."
-    )
+col3.metric(
+    "Осталось",
+    total_points
+    - completed_points
+)
