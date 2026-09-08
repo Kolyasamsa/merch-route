@@ -180,6 +180,76 @@ def upload_visit_photos(
 
     return uploaded
 
+# =========================================================
+# ЗАМЕНА ФОТОГРАФИЙ ТТ
+# =========================================================
+
+def replace_visit_photos(
+    files,
+    visit_id,
+):
+
+    # Получаем текущие фотографии
+    photos_response = (
+        supabase
+        .table("point_photos")
+        .select("*")
+        .eq("visit_id", str(visit_id))
+        .execute()
+    )
+
+    old_photos = (
+        photos_response.data
+        or []
+    )
+
+
+    # Получаем пути старых файлов
+    old_file_paths = [
+
+        photo["file_path"]
+
+        for photo in old_photos
+    ]
+
+
+    # Удаляем старые файлы из Storage
+    if old_file_paths:
+
+        supabase.storage.from_(
+            STORAGE_BUCKET
+        ).remove(
+            old_file_paths
+        )
+
+
+    # Удаляем старые записи из базы
+    (
+        supabase
+        .table("point_photos")
+        .delete()
+        .eq(
+            "visit_id",
+            str(visit_id),
+        )
+        .execute()
+    )
+
+
+    # Загружаем новые фотографии
+    uploaded_photos = (
+        upload_visit_photos(
+            files,
+            visit_id,
+        )
+    )
+
+
+    # Очищаем кэш
+    clear_database_cache()
+
+
+    return uploaded_photos
 
 # =========================================================
 # СБРОС ПРОХОЖДЕНИЯ ТТ
