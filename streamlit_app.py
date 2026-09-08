@@ -1,4 +1,3 @@
-```python
 import streamlit as st
 import pandas as pd
 from datetime import datetime, date
@@ -859,4 +858,3 @@ col3.metric(
     total_points
     - completed_points
 )
-```
