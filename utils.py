@@ -1,175 +1,189 @@
-import calendar
-
 from datetime import date
+from datetime import datetime
+
+from config import DAYS
+
 
 # =========================================================
-
 # МЕСЯЦЫ
-
 # =========================================================
 
 MONTHS = [
 
-```
-"Январь",
-"Февраль",
-"Март",
-"Апрель",
-"Май",
-"Июнь",
-
-"Июль",
-"Август",
-"Сентябрь",
-"Октябрь",
-"Ноябрь",
-"Декабрь",
-```
+    "Январь",
+    "Февраль",
+    "Март",
+    "Апрель",
+    "Май",
+    "Июнь",
+    "Июль",
+    "Август",
+    "Сентябрь",
+    "Октябрь",
+    "Ноябрь",
+    "Декабрь",
 
 ]
 
-# =========================================================
-
-# ДЕНЬ НЕДЕЛИ -> НОМЕР
 
 # =========================================================
-
-WEEKDAY_MAP = {
-
-```
-"Понедельник": 0,
-"Вторник": 1,
-"Среда": 2,
-"Четверг": 3,
-"Пятница": 4,
-"Суббота": 5,
-"Воскресенье": 6,
-```
-
-}
-
-# =========================================================
-
-# УНИКАЛЬНЫЙ КЛЮЧ ТТ
-
+# КЛЮЧ ТОРГОВОЙ ТОЧКИ
 # =========================================================
 
 def get_point_key(
-worker,
-weekday,
-route,
-shop,
-address,
+
+    worker,
+    weekday,
+    route,
+    shop,
+    address,
+
 ):
 
-```
-return (
+    return (
+        f"{worker}|"
+        f"{weekday}|"
+        f"{route}|"
+        f"{shop}|"
+        f"{address}"
+    )
 
-    str(worker),
-
-    str(weekday),
-
-    str(route),
-
-    str(shop),
-
-    str(address),
-)
-```
 
 # =========================================================
-
-# ДАТЫ КОНКРЕТНОГО ДНЯ НЕДЕЛИ
-
+# ДАТЫ ОПРЕДЕЛЁННОГО ДНЯ НЕДЕЛИ
 # =========================================================
 
 def get_dates_for_weekday(
-year,
-month,
-weekday_name,
+
+    year,
+    month,
+    weekday,
+
 ):
 
-```
-weekday_number = (
-    WEEKDAY_MAP[
-        weekday_name
-    ]
-)
+    weekday_index = (
+        DAYS.index(
+            weekday
+        )
+    )
 
 
-days_in_month = (
-    calendar.monthrange(
-        year,
-        month,
-    )[1]
-)
-
-
-dates = []
-
-
-for day_number in range(
-    1,
-    days_in_month + 1,
-):
+    dates = []
 
     current_date = date(
         year,
         month,
-        day_number,
+        1,
     )
 
 
-    if (
-        current_date.weekday()
-        == weekday_number
-    ):
-
-        dates.append(
-            current_date
-        )
+    while current_date.month == month:
 
 
-return dates
-```
+        if current_date.weekday() == weekday_index:
+
+            dates.append(
+                current_date
+            )
+
+
+        if current_date.day == 31:
+
+            break
+
+
+        try:
+
+            current_date = date(
+
+                current_date.year,
+
+                current_date.month,
+
+                current_date.day + 1,
+
+            )
+
+
+        except ValueError:
+
+            break
+
+
+    return dates
+
 
 # =========================================================
-
 # ДАТА ПО УМОЛЧАНИЮ
-
 # =========================================================
 
 def get_default_date(
-available_dates,
+    available_dates,
 ):
 
-```
-today = date.today()
+    today = date.today()
 
 
-# Сегодня
-if today in available_dates:
+    # Если сегодня входит
+    # в доступные даты
 
-    return today
+    if today in available_dates:
 
-
-# Следующая доступная дата
-future_dates = [
-
-    value
-
-    for value
-    in available_dates
-
-    if value >= today
-]
+        return today
 
 
-if future_dates:
+    # Берём ближайшую будущую дату
 
-    return future_dates[0]
+    future_dates = [
+
+        value
+
+        for value
+        in available_dates
+
+        if value >= today
+
+    ]
 
 
-# Если месяц уже прошёл
-return available_dates[-1]
-```
+    if future_dates:
+
+        return future_dates[0]
+
+
+    # Если будущих дат нет —
+    # последняя доступная
+
+    return available_dates[-1]
+
+
+# =========================================================
+# ФОРМАТИРОВАНИЕ ДАТЫ
+# =========================================================
+
+def format_date_short(
+    value,
+):
+
+    months_short = [
+
+        "янв",
+        "фев",
+        "мар",
+        "апр",
+        "мая",
+        "июн",
+        "июл",
+        "авг",
+        "сен",
+        "окт",
+        "ноя",
+        "дек",
+
+    ]
+
+
+    return (
+        f"{value.day:02d}."
+        f"{months_short[value.month - 1]}"
+    )
