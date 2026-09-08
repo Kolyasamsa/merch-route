@@ -26,6 +26,15 @@ from database.photos import (
 )
 
 
+from database.comments import (
+
+    get_visit_comments,
+
+    create_visit_comment,
+
+)
+
+
 # =========================================================
 # СБРОС ПРОХОЖДЕНИЯ ТТ
 # =========================================================
