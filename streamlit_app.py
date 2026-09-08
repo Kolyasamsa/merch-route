@@ -4,6 +4,10 @@ import streamlit as st
 
 from auth import login, logout
 
+from supervisor import (
+    show_supervisor_dashboard,
+)
+
 from config import DAYS
 
 from routes import (
@@ -48,9 +52,9 @@ st.set_page_config(
 # АВТОРИЗАЦИЯ
 # =========================================================
 
-worker = login()
+user_name, user_role = login()
 
-if not worker:
+if not user_name:
     st.stop()
 
 
@@ -69,7 +73,29 @@ except Exception as error:
     )
 
     st.stop()
+# =========================================================
+# КАБИНЕТ СУПЕРВАЙЗЕРА
+# =========================================================
 
+if user_role == "supervisor":
+
+    show_supervisor_dashboard(
+
+        df,
+
+        user_name,
+
+        logout,
+    )
+
+    st.stop()
+
+
+# =========================================================
+# КАБИНЕТ МЕРЧЕНДАЙЗЕРА
+# =========================================================
+
+worker = user_name
 
 # =========================================================
 # ПРОВЕРКА МЕРЧЕНДАЙЗЕРА
