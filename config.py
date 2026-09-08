@@ -1,26 +1,49 @@
 import streamlit as st
+
 from supabase import create_client
 
+# =========================================================
 
-EXCEL_FILE = "routes.xlsx"
+# SUPABASE
 
-STORAGE_BUCKET = "point-photos"
+# =========================================================
 
+SUPABASE_URL = (
+st.secrets["supabase"]["url"]
+)
 
-DAYS = [
-    "Понедельник",
-    "Вторник",
-    "Среда",
-    "Четверг",
-    "Пятница",
-]
-
-
-SUPABASE_URL = st.secrets["SUPABASE_URL"]
-SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
-
+SUPABASE_KEY = (
+st.secrets["supabase"]["key"]
+)
 
 supabase = create_client(
-    SUPABASE_URL,
-    SUPABASE_KEY,
+SUPABASE_URL,
+SUPABASE_KEY,
 )
+
+# =========================================================
+
+# STORAGE
+
+# =========================================================
+
+STORAGE_BUCKET = (
+st.secrets["supabase"]["bucket"]
+)
+
+# =========================================================
+
+# ДНИ НЕДЕЛИ
+
+# =========================================================
+
+DAYS = [
+"Понедельник",
+"Вторник",
+"Среда",
+"Четверг",
+"Пятница",
+"Суббота",
+"Воскресенье",
+]
+
