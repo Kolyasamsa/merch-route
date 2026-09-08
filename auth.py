@@ -1,11 +1,13 @@
 import streamlit as st
 
 
-def get_worker_by_password(password):
-    """
-    Возвращает имя мерчендайзера,
-    которому принадлежит введённый пароль.
-    """
+# =========================================================
+# ПОИСК МЕРЧЕНДАЙЗЕРА ПО ПАРОЛЮ
+# =========================================================
+
+def get_worker_by_password(
+    password,
+):
 
     workers = st.secrets.get(
         "workers",
@@ -21,24 +23,54 @@ def get_worker_by_password(password):
     return None
 
 
+# =========================================================
+# ПОИСК СУПЕРВАЙЗЕРА ПО ПАРОЛЮ
+# =========================================================
+
+def get_supervisor_by_password(
+    password,
+):
+
+    supervisors = st.secrets.get(
+        "supervisors",
+        {},
+    )
+
+    for supervisor, supervisor_password in supervisors.items():
+
+        if password == supervisor_password:
+
+            return supervisor
+
+    return None
+
+
+# =========================================================
+# АВТОРИЗАЦИЯ
+# =========================================================
+
 def login():
-    """
-    Показывает экран входа.
 
-    Если пользователь уже вошёл —
-    возвращает его имя.
+    # -----------------------------------------------------
+    # ПРОВЕРКА УЖЕ АВТОРИЗОВАННОГО ПОЛЬЗОВАТЕЛЯ
+    # -----------------------------------------------------
 
-    Если ещё не вошёл —
-    показывает поле пароля.
-    """
+    if (
+        "user_name" in st.session_state
+        and
+        "user_role" in st.session_state
+    ):
 
-    # Проверяем, есть ли уже авторизованный пользователь
-    if "worker" in st.session_state:
+        return (
+            st.session_state["user_name"],
+            st.session_state["user_role"],
+        )
 
-        return st.session_state["worker"]
 
+    # -----------------------------------------------------
+    # ЭКРАН ВХОДА
+    # -----------------------------------------------------
 
-    # Экран входа
     st.title(
         "📍 Маршруты мерчендайзеров"
     )
@@ -49,16 +81,22 @@ def login():
 
 
     password = st.text_input(
+
         "🔐 Пароль",
+
         type="password",
     )
 
 
     if st.button(
+
         "Войти",
+
         type="primary",
+
         use_container_width=True,
     ):
+
 
         if not password:
 
@@ -66,41 +104,78 @@ def login():
                 "Введите пароль."
             )
 
-            return None
+            return None, None
 
 
-        worker = get_worker_by_password(
-            password
+        # -------------------------------------------------
+        # СНАЧАЛА ИЩЕМ МЕРЧЕНДАЙЗЕРА
+        # -------------------------------------------------
+
+        worker = (
+            get_worker_by_password(
+                password
+            )
         )
 
 
         if worker:
 
-            # Запоминаем вошедшего мерчендайзера
-            st.session_state["worker"] = (
-                worker
-            )
+            st.session_state[
+                "user_name"
+            ] = worker
+
+            st.session_state[
+                "user_role"
+            ] = "worker"
 
             st.rerun()
 
 
-        else:
+        # -------------------------------------------------
+        # ИЩЕМ СУПЕРВАЙЗЕРА
+        # -------------------------------------------------
 
-            st.error(
-                "Неверный пароль."
+        supervisor = (
+            get_supervisor_by_password(
+                password
             )
+        )
 
 
-    return None
+        if supervisor:
 
+            st.session_state[
+                "user_name"
+            ] = supervisor
+
+            st.session_state[
+                "user_role"
+            ] = "supervisor"
+
+            st.rerun()
+
+
+        st.error(
+            "Неверный пароль."
+        )
+
+
+    return None, None
+
+
+# =========================================================
+# ВЫХОД
+# =========================================================
 
 def logout():
-    """
-    Выход из аккаунта.
-    """
 
     st.session_state.pop(
-        "worker",
+        "user_name",
+        None,
+    )
+
+    st.session_state.pop(
+        "user_role",
         None,
     )
 
