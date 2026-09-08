@@ -1,182 +1,180 @@
 import streamlit as st
 
-
 # =========================================================
+
 # ПОИСК МЕРЧЕНДАЙЗЕРА ПО ПАРОЛЮ
+
 # =========================================================
 
 def get_worker_by_password(
-    password,
+password,
 ):
 
-    workers = st.secrets.get(
-        "workers",
-        {},
-    )
+```
+workers = st.secrets.get(
+    "workers",
+    {},
+)
 
-    for worker, worker_password in workers.items():
+for worker, worker_password in workers.items():
 
-        if password == worker_password:
+    if password == worker_password:
 
-            return worker
+        return worker
 
-    return None
-
+return None
+```
 
 # =========================================================
-# ПОИСК СУПЕРВАЙЗЕРА ПО ПАРОЛЮ
+
+# ПРОВЕРКА СУПЕРВАЙЗЕРА
+
 # =========================================================
 
-def get_supervisor_by_password(
-    password,
+def is_supervisor_password(
+password,
 ):
 
-    supervisors = st.secrets.get(
-        "supervisors",
-        {},
+```
+supervisor_password = (
+    st.secrets.get(
+        "supervisor_password",
+        "",
     )
+)
 
-    for supervisor, supervisor_password in supervisors.items():
-
-        if password == supervisor_password:
-
-            return supervisor
-
-    return None
-
+return (
+    password
+    == supervisor_password
+)
+```
 
 # =========================================================
-# АВТОРИЗАЦИЯ
+
+# ВХОД
+
 # =========================================================
 
 def login():
 
-    # -----------------------------------------------------
-    # ПРОВЕРКА УЖЕ АВТОРИЗОВАННОГО ПОЛЬЗОВАТЕЛЯ
-    # -----------------------------------------------------
+```
+# -----------------------------------------------------
+# ЕСЛИ ПОЛЬЗОВАТЕЛЬ УЖЕ ВОШЁЛ
+# -----------------------------------------------------
 
-    if (
-        "user_name" in st.session_state
-        and
-        "user_role" in st.session_state
+if "user_type" in st.session_state:
+
+    return (
+        st.session_state["user_type"],
+        st.session_state["user_name"],
+    )
+
+
+# -----------------------------------------------------
+# ЭКРАН ВХОДА
+# -----------------------------------------------------
+
+st.title(
+    "📍 Маршруты мерчендайзеров"
+)
+
+st.caption(
+    "Введите пароль"
+)
+
+
+password = st.text_input(
+    "🔐 Пароль",
+    type="password",
+)
+
+
+if st.button(
+    "Войти",
+    type="primary",
+    use_container_width=True,
+):
+
+    if not password:
+
+        st.warning(
+            "Введите пароль."
+        )
+
+        return None, None
+
+
+    # -------------------------------------------------
+    # СУПЕРВАЙЗЕР
+    # -------------------------------------------------
+
+    if is_supervisor_password(
+        password
     ):
 
-        return (
-            st.session_state["user_name"],
-            st.session_state["user_role"],
+        st.session_state[
+            "user_type"
+        ] = "supervisor"
+
+        st.session_state[
+            "user_name"
+        ] = "Супервайзер"
+
+        st.rerun()
+
+
+    # -------------------------------------------------
+    # МЕРЧЕНДАЙЗЕР
+    # -------------------------------------------------
+
+    worker = (
+        get_worker_by_password(
+            password
         )
-
-
-    # -----------------------------------------------------
-    # ЭКРАН ВХОДА
-    # -----------------------------------------------------
-
-    st.title(
-        "📍 Маршруты мерчендайзеров"
-    )
-
-    st.caption(
-        "Введите свой пароль"
-    )
-
-
-    password = st.text_input(
-
-        "🔐 Пароль",
-
-        type="password",
     )
 
 
-    if st.button(
+    if worker:
 
-        "Войти",
+        st.session_state[
+            "user_type"
+        ] = "worker"
 
-        type="primary",
+        st.session_state[
+            "user_name"
+        ] = worker
 
-        use_container_width=True,
-    ):
-
-
-        if not password:
-
-            st.warning(
-                "Введите пароль."
-            )
-
-            return None, None
+        st.rerun()
 
 
-        # -------------------------------------------------
-        # СНАЧАЛА ИЩЕМ МЕРЧЕНДАЙЗЕРА
-        # -------------------------------------------------
-
-        worker = (
-            get_worker_by_password(
-                password
-            )
-        )
-
-
-        if worker:
-
-            st.session_state[
-                "user_name"
-            ] = worker
-
-            st.session_state[
-                "user_role"
-            ] = "worker"
-
-            st.rerun()
-
-
-        # -------------------------------------------------
-        # ИЩЕМ СУПЕРВАЙЗЕРА
-        # -------------------------------------------------
-
-        supervisor = (
-            get_supervisor_by_password(
-                password
-            )
-        )
-
-
-        if supervisor:
-
-            st.session_state[
-                "user_name"
-            ] = supervisor
-
-            st.session_state[
-                "user_role"
-            ] = "supervisor"
-
-            st.rerun()
-
+    else:
 
         st.error(
             "Неверный пароль."
         )
 
 
-    return None, None
-
+return None, None
+```
 
 # =========================================================
+
 # ВЫХОД
+
 # =========================================================
 
 def logout():
 
-    st.session_state.pop(
-        "user_name",
-        None,
-    )
+```
+st.session_state.pop(
+    "user_type",
+    None,
+)
 
-    st.session_state.pop(
-        "user_role",
-        None,
-    )
+st.session_state.pop(
+    "user_name",
+    None,
+)
 
-    st.rerun()
+st.rerun()
+```
