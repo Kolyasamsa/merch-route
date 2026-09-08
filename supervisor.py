@@ -160,6 +160,10 @@ for worker in workers:
 
     total = 0
 
+    # -------------------------------------------------
+    # ВСЕ ДНИ МЕСЯЦА
+    # -------------------------------------------------
+
     for day_number in range(
         1,
         days_in_month + 1,
@@ -187,6 +191,10 @@ for worker in workers:
         row[column_name] = completed_count
 
         total += completed_count
+
+    # -------------------------------------------------
+    # ИТОГО
+    # -------------------------------------------------
 
     row["Итого"] = total
 
@@ -384,7 +392,7 @@ with tab_routes:
 
     # =================================================
     # ДОСТУПНЫЕ ДАТЫ
-    # =====================================================
+    # =================================================
 
     available_dates = get_dates_for_weekday(
         year,
@@ -417,7 +425,7 @@ with tab_routes:
 
     # =================================================
     # МАРШРУТЫ
-    # =====================================================
+    # =================================================
 
     day_data, routes = get_routes_for_day(
         worker_data,
@@ -426,7 +434,7 @@ with tab_routes:
 
     # =================================================
     # ЗАГРУЖАЕМ ПРОЙДЕННЫЕ ТТ
-    # =====================================================
+    # =================================================
 
     try:
 
@@ -446,7 +454,7 @@ with tab_routes:
 
     # =================================================
     # СЛОВАРЬ ПРОЙДЕННЫХ ТТ
-    # =====================================================
+    # =================================================
 
     completed_visits = {
 
@@ -463,7 +471,7 @@ with tab_routes:
 
     # =================================================
     # ОБЩАЯ ИНФОРМАЦИЯ
-    # =====================================================
+    # =================================================
 
     st.divider()
 
@@ -522,7 +530,7 @@ with tab_routes:
 
     # =================================================
     # МАРШРУТЫ
-    # =====================================================
+    # =================================================
 
     for route in routes:
 
@@ -588,7 +596,7 @@ with tab_routes:
             ]
 
             address = point[
-                "Адрес"]
+                "Адрес"
             ]
 
             point_key = get_point_key(
@@ -707,8 +715,10 @@ with tab_routes:
 
                     try:
 
-                        photos = get_visit_photos(
-                            visit["id"]
+                        photos = (
+                            get_visit_photos(
+                                visit["id"]
+                            )
                         )
 
                         if photos:
@@ -754,7 +764,7 @@ with tab_routes:
                     st.divider()
 
                     st.subheader(
-                        "💬 Обсуждение"
+                        "💬 Обсуждение ТТ"
                     )
 
                     try:
@@ -765,144 +775,151 @@ with tab_routes:
                             )
                         )
 
-                    except Exception as error:
+                        # ---------------------------------
+                        # СУЩЕСТВУЮЩИЕ КОММЕНТАРИИ
+                        # ---------------------------------
 
-                        st.warning(
-                            f"Не удалось загрузить "
-                            f"комментарии: {error}"
+                        if visit_comments:
+
+                            for visit_comment in visit_comments:
+
+                                author = (
+                                    visit_comment.get(
+                                        "author",
+                                        "Неизвестно",
+                                    )
+                                )
+
+                                author_role = (
+                                    visit_comment.get(
+                                        "author_role",
+                                        "",
+                                    )
+                                )
+
+                                comment_text = (
+                                    visit_comment.get(
+                                        "comment",
+                                        "",
+                                    )
+                                )
+
+                                created_at = (
+                                    visit_comment.get(
+                                        "created_at",
+                                        "",
+                                    )
+                                )
+
+                                if (
+                                    author_role
+                                    == "supervisor"
+                                ):
+
+                                    role_text = (
+                                        "👩‍💼 Супервайзер"
+                                    )
+
+                                else:
+
+                                    role_text = (
+                                        "👤 Мерчендайзер"
+                                    )
+
+                                st.markdown(
+                                    f"**{role_text}: "
+                                    f"{author}**"
+                                )
+
+                                st.write(
+                                    comment_text
+                                )
+
+                                if created_at:
+
+                                    st.caption(
+                                        f"🕒 {created_at}"
+                                    )
+
+                                st.divider()
+
+                        else:
+
+                            st.caption(
+                                "Комментариев пока нет."
+                            )
+
+                        # ---------------------------------
+                        # НОВЫЙ КОММЕНТАРИЙ
+                        # ---------------------------------
+
+                        new_comment = st.text_area(
+
+                            "Написать комментарий",
+
+                            placeholder=(
+                                "Например: торты нужно было "
+                                "переставить на уровень глаз..."
+                            ),
+
+                            key=(
+                                f"supervisor_comment_"
+                                f"{visit['id']}"
+                            ),
                         )
 
-                        visit_comments = []
+                        if st.button(
 
-                    # -------------------------------------
-                    # СПИСОК КОММЕНТАРИЕВ
-                    # -------------------------------------
+                            "💬 Отправить комментарий",
 
-                    if visit_comments:
+                            key=(
+                                f"send_supervisor_comment_"
+                                f"{visit['id']}"
+                            ),
 
-                        for visit_comment in visit_comments:
+                            type="primary",
 
-                            author = visit_comment.get(
-                                "author",
-                                "Неизвестный",
-                            )
+                            use_container_width=True,
+                        ):
 
-                            author_role = visit_comment.get(
-                                "author_role",
-                                "",
-                            )
+                            if not new_comment.strip():
 
-                            comment_text = visit_comment.get(
-                                "comment",
-                                "",
-                            )
-
-                            created_at = visit_comment.get(
-                                "created_at",
-                                "",
-                            )
-
-                            if author_role == "supervisor":
-
-                                role_text = (
-                                    "👩‍💼 Супервайзер"
+                                st.warning(
+                                    "Введите комментарий."
                                 )
 
                             else:
 
-                                role_text = (
-                                    "👤 Мерчендайзер"
-                                )
+                                try:
 
-                            st.markdown(
-                                f"**{author} · "
-                                f"{role_text}**"
-                            )
+                                    create_visit_comment(
 
-                            if created_at:
+                                        visit["id"],
 
-                                st.caption(
-                                    created_at
-                                )
+                                        supervisor,
 
-                            st.write(
-                                comment_text
-                            )
+                                        "supervisor",
 
-                            st.divider()
+                                        new_comment,
+                                    )
 
-                    else:
+                                    st.rerun()
 
-                        st.caption(
-                            "Комментариев пока нет."
+                                except Exception as error:
+
+                                    st.error(
+
+                                        f"Ошибка отправки "
+                                        f"комментария: {error}"
+                                    )
+
+                    except Exception as error:
+
+                        st.warning(
+
+                            f"Не удалось загрузить "
+                            f"комментарии: {error}"
                         )
-
-                    # -------------------------------------
-                    # НОВЫЙ КОММЕНТАРИЙ
-                    # -------------------------------------
-
-                    new_comment = st.text_area(
-
-                        "✍️ Написать комментарий",
-
-                        placeholder=(
-                            "Напишите замечание "
-                            "или комментарий..."
-                        ),
-
-                        key=(
-                            f"supervisor_comment_"
-                            f"{visit['id']}"
-                        ),
-                    )
-
-                    if st.button(
-
-                        "➤ Отправить комментарий",
-
-                        key=(
-                            f"send_supervisor_comment_"
-                            f"{visit['id']}"
-                        ),
-
-                        type="primary",
-
-                        use_container_width=True,
-                    ):
-
-                        if not new_comment.strip():
-
-                            st.warning(
-                                "Введите текст комментария."
-                            )
-
-                        else:
-
-                            try:
-
-                                create_visit_comment(
-
-                                    visit["id"],
-
-                                    supervisor,
-
-                                    "supervisor",
-
-                                    new_comment,
-                                )
-
-                                st.success(
-                                    "Комментарий отправлен."
-                                )
-
-                                st.rerun()
-
-                            except Exception as error:
-
-                                st.error(
-                                    f"Ошибка отправки "
-                                    f"комментария: {error}"
-                                )
 
 # =====================================================
 # ТАБЕЛЬ
