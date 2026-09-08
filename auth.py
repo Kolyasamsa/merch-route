@@ -126,11 +126,10 @@ st.session_state.pop(
     None,
 )
 
-# Удаляем старый ключ,
-# если он остался от предыдущей версии
 st.session_state.pop(
     "worker",
     None,
 )
 
 st.rerun()
+```
