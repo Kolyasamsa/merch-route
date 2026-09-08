@@ -1,9 +1,8 @@
 import streamlit as st
+import openpyxl
 from datetime import datetime
+import os
 
-# ==========================================
-# НАСТРОЙКИ СТРАНИЦЫ
-# ==========================================
 
 st.set_page_config(
     page_title="Маршруты мерчендайзеров",
@@ -13,113 +12,126 @@ st.set_page_config(
 
 
 # ==========================================
-# МАРШРУТЫ
-#
-# Здесь позже будут реальные маршруты.
-# Каждый мерчендайзер имеет 5 маршрутов:
-# Понедельник - Пятница
+# ИМЯ EXCEL-ФАЙЛА
 # ==========================================
 
-routes = {
-
-    "Олеся": {
-
-        "Понедельник": [
-            {
-                "shop": "Пятерочка",
-                "address": "Адрес 1"
-            },
-            {
-                "shop": "Пятерочка",
-                "address": "Адрес 2"
-            },
-            {
-                "shop": "Монетка",
-                "address": "Адрес 3"
-            }
-        ],
-
-        "Вторник": [
-            {
-                "shop": "Пятерочка",
-                "address": "Адрес 4"
-            },
-            {
-                "shop": "Монетка",
-                "address": "Адрес 5"
-            }
-        ],
-
-        "Среда": [
-            {
-                "shop": "Пятерочка",
-                "address": "Адрес 6"
-            }
-        ],
-
-        "Четверг": [
-            {
-                "shop": "Монетка",
-                "address": "Адрес 7"
-            }
-        ],
-
-        "Пятница": [
-            {
-                "shop": "Пятерочка",
-                "address": "Адрес 8"
-            }
-        ]
-    },
+EXCEL_FILE = "для проверки маршрут мерчей август (1).xlsx"
 
 
-    "Владимир": {
+# ==========================================
+# ДНИ И ИХ КОЛОНКИ В ТВОЁМ EXCEL
+#
+# Понедельник:
+# A = сеть
+# B = адрес
+#
+# Вторник:
+# H = сеть
+# I = адрес
+#
+# Среда:
+# O = сеть
+# P = адрес
+#
+# Четверг и пятница пока определим
+# автоматически ниже.
+# ==========================================
 
-        "Понедельник": [
-            {
-                "shop": "Пятерочка",
-                "address": "Адрес 1"
-            }
-        ],
-
-        "Вторник": [
-            {
-                "shop": "Монетка",
-                "address": "Адрес 2"
-            }
-        ],
-
-        "Среда": [
-            {
-                "shop": "Пятерочка",
-                "address": "Адрес 3"
-            }
-        ],
-
-        "Четверг": [
-            {
-                "shop": "Пятерочка",
-                "address": "Адрес 4"
-            }
-        ],
-
-        "Пятница": [
-            {
-                "shop": "Монетка",
-                "address": "Адрес 5"
-            }
-        ]
-    }
+DAY_COLUMNS = {
+    "Понедельник": (1, 2),
+    "Вторник": (8, 9),
+    "Среда": (15, 16),
 }
 
 
+@st.cache_data
+def load_routes():
+
+    routes = {}
+
+    if not os.path.exists(EXCEL_FILE):
+        return None
+
+    workbook = openpyxl.load_workbook(
+        EXCEL_FILE,
+        data_only=False
+    )
+
+    for sheet_name in workbook.sheetnames:
+
+        sheet = workbook[sheet_name]
+
+        # Имя мерчендайзера находится в A1.
+        worker_name = sheet["A1"].value
+
+        if not worker_name:
+            worker_name = sheet_name
+
+        worker_name = str(worker_name).strip()
+
+        routes[worker_name] = {
+            "Понедельник": [],
+            "Вторник": [],
+            "Среда": [],
+            "Четверг": [],
+            "Пятница": []
+        }
+
+        # Читаем известные блоки маршрутов
+        for day, columns in DAY_COLUMNS.items():
+
+            shop_column = columns[0]
+            address_column = columns[1]
+
+            for row in range(3, sheet.max_row + 1):
+
+                shop = sheet.cell(
+                    row,
+                    shop_column
+                ).value
+
+                address = sheet.cell(
+                    row,
+                    address_column
+                ).value
+
+                # Если есть и сеть, и адрес —
+                # считаем это торговой точкой.
+                if shop and address:
+
+                    routes[worker_name][day].append({
+                        "shop": str(shop).strip(),
+                        "address": str(address).strip()
+                    })
+
+    return routes
+
+
 # ==========================================
-# ДНИ НЕДЕЛИ
-# Python считает:
-# Понедельник = 0
-# Вторник = 1
-# ...
-# Пятница = 4
+# ЗАГРУЖАЕМ МАРШРУТЫ
+# ==========================================
+
+routes = load_routes()
+
+
+# ==========================================
+# ЕСЛИ EXCEL НЕ НАЙДЕН
+# ==========================================
+
+if routes is None:
+
+    st.error(
+        "Excel-файл не найден. "
+        "Проверь, что он загружен в GitHub "
+        "и его название совпадает с названием "
+        "в переменной EXCEL_FILE."
+    )
+
+    st.stop()
+
+
+# ==========================================
+# ОПРЕДЕЛЯЕМ СЕГОДНЯШНИЙ ДЕНЬ
 # ==========================================
 
 days = [
@@ -130,38 +142,22 @@ days = [
     "Пятница"
 ]
 
-
-# Определяем сегодняшний день
 today_number = datetime.today().weekday()
 
 if today_number < 5:
     today = days[today_number]
 else:
-    today = None
+    today = "Понедельник"
 
 
 # ==========================================
-# СОСТОЯНИЕ ПРИЛОЖЕНИЯ
-# ==========================================
-
-if "completed" not in st.session_state:
-    st.session_state.completed = {}
-
-if "photos" not in st.session_state:
-    st.session_state.photos = {}
-
-if "comments" not in st.session_state:
-    st.session_state.comments = {}
-
-
-# ==========================================
-# ЗАГОЛОВОК
+# ИНТЕРФЕЙС
 # ==========================================
 
 st.title("📍 Маршруты мерчендайзеров")
 
 st.caption(
-    "Загрузка фотографий и контроль прохождения торговых точек"
+    "Маршруты автоматически загружаются из Excel"
 )
 
 
@@ -170,7 +166,7 @@ st.caption(
 # ==========================================
 
 worker = st.selectbox(
-    "👤 Выберите мерчендайзера",
+    "👤 Мерчендайзер",
     list(routes.keys())
 )
 
@@ -179,20 +175,10 @@ worker = st.selectbox(
 # ВЫБОР ДНЯ
 # ==========================================
 
-# Если сегодня рабочий день — автоматически
-# выбираем сегодняшний день.
-# Но пока можно переключать день вручную.
-
-if today in days:
-    default_day_index = days.index(today)
-else:
-    default_day_index = 0
-
-
 day = st.selectbox(
     "📅 День маршрута",
     days,
-    index=default_day_index
+    index=days.index(today)
 )
 
 
@@ -200,215 +186,67 @@ st.divider()
 
 
 # ==========================================
-# ИНФОРМАЦИЯ О МАРШРУТЕ
+# ВЫВОД МАРШРУТА
 # ==========================================
-
-st.subheader(f"👤 {worker}")
-
-st.write(f"📅 **Маршрут: {day}**")
 
 points = routes[worker][day]
 
-total_points = len(points)
+st.subheader(
+    f"{worker} — {day}"
+)
 
-completed_count = 0
-
-
-# ==========================================
-# ТОРГОВЫЕ ТОЧКИ
-# ==========================================
-
-for i, point in enumerate(points):
-
-    # Уникальный ID ТТ.
-    # Добавляем мерчендайзера и день,
-    # чтобы одна и та же ТТ в разных
-    # маршрутах не путалась.
-
-    point_id = f"{worker}_{day}_{i}"
-
-    # Проверяем статус
-
-    if point_id in st.session_state.completed:
-
-        status = "🟢 Пройдена"
-        completed_count += 1
-
-    else:
-
-        status = "🔴 Не пройдена"
-
-
-    # ======================================
-    # ОТКРЫВАЮЩИЙСЯ БЛОК ТТ
-    # ======================================
-
-    with st.expander(
-        f"{status} — {point['shop']} — {point['address']}",
-        expanded=False
-    ):
-
-        st.write(f"🏪 **Магазин:** {point['shop']}")
-
-        st.write(f"📍 **Адрес:** {point['address']}")
-
-
-        # ==================================
-        # ЗАГРУЗКА ФОТО
-        # ==================================
-
-        uploaded_photos = st.file_uploader(
-
-            "📷 Загрузить фотографии",
-
-            type=[
-                "jpg",
-                "jpeg",
-                "png"
-            ],
-
-            accept_multiple_files=True,
-
-            key=f"upload_{point_id}"
-        )
-
-
-        # ==================================
-        # КОММЕНТАРИЙ
-        # ==================================
-
-        comment = st.text_area(
-
-            "💬 Комментарий",
-
-            placeholder=
-            "Например: товара нет, "
-            "малый остаток, причина отсутствия товара...",
-
-            key=f"comment_{point_id}"
-        )
-
-
-        # ==================================
-        # ИНФОРМАЦИЯ О ФОТО
-        # ==================================
-
-        if uploaded_photos:
-
-            st.info(
-                f"📷 Загружено фотографий: "
-                f"{len(uploaded_photos)}"
-            )
-
-
-        # ==================================
-        # ЗАВЕРШЕНИЕ ТТ
-        # ==================================
-
-        if st.button(
-
-            "✓ Завершить ТТ",
-
-            key=f"complete_{point_id}"
-
-        ):
-
-            # Пока сохраняем только
-            # в памяти приложения.
-            # В следующей версии
-            # подключим базу данных.
-
-            st.session_state.completed[point_id] = {
-
-                "worker": worker,
-
-                "day": day,
-
-                "shop": point["shop"],
-
-                "address": point["address"],
-
-                "completed_time":
-                datetime.now().strftime(
-                    "%d.%m.%Y %H:%M"
-                )
-
-            }
-
-
-            st.session_state.photos[
-                point_id
-            ] = uploaded_photos
-
-
-            st.session_state.comments[
-                point_id
-            ] = comment
-
-
-            st.success(
-                "Торговая точка отмечена "
-                "как пройденная"
-            )
-
-
-            st.rerun()
-
-
-        # ==================================
-        # ЕСЛИ ТТ УЖЕ ПРОЙДЕНА
-        # ==================================
-
-        if point_id in st.session_state.completed:
-
-            completed_data = (
-                st.session_state.completed[
-                    point_id
-                ]
-            )
-
-
-            st.success(
-                "🟢 ТТ пройдена"
-            )
-
-
-            st.write(
-                "🕒 Время завершения: "
-                + completed_data[
-                    "completed_time"
-                ]
-            )
+st.write(
+    f"Всего ТТ в маршруте: "
+    f"**{len(points)}**"
+)
 
 
 # ==========================================
-# ПРОГРЕСС МАРШРУТА
+# ВЫВОД ТОРГОВЫХ ТОЧЕК
 # ==========================================
 
-st.divider()
+if len(points) == 0:
 
-st.subheader("📊 Прогресс маршрута")
-
-
-if total_points > 0:
-
-    progress = (
-        completed_count /
-        total_points
+    st.warning(
+        "Для этого дня пока "
+        "не удалось найти ТТ."
     )
-
-    st.progress(progress)
-
-    st.write(
-        f"**Пройдено: "
-        f"{completed_count} "
-        f"из {total_points} ТТ**"
-    )
-
 
 else:
 
-    st.warning(
-        "Для этого маршрута пока "
-        "не добавлены торговые точки."
-    )
+    for number, point in enumerate(
+        points,
+        start=1
+    ):
+
+        st.write(
+            f"**{number}. {point['shop']}**"
+        )
+
+        st.caption(
+            f"📍 {point['address']}"
+        )
+
+        st.divider()
+
+
+# ==========================================
+# ТЕХНИЧЕСКАЯ ИНФОРМАЦИЯ
+# ==========================================
+
+with st.expander(
+    "🔧 Проверка импорта"
+):
+
+    for worker_name, worker_routes in routes.items():
+
+        st.write(
+            f"**{worker_name}**"
+        )
+
+        for day_name, day_points in worker_routes.items():
+
+            st.write(
+                f"{day_name}: "
+                f"{len(day_points)} ТТ"
+            )
