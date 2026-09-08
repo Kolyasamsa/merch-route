@@ -589,7 +589,6 @@ for route in routes:
 
             if not is_completed:
 
-
                 photos = st.file_uploader(
 
                     "📷 Добавить фотографии",
@@ -625,76 +624,75 @@ for route in routes:
                 )
 
 
-if st.button(
+                if st.button(
 
-    "✓ ЗАВЕРШИТЬ ТТ",
+                    "✓ ЗАВЕРШИТЬ ТТ",
 
-    key=(
-        f"complete_{point_key}"
-    ),
+                    key=(
+                        f"complete_{point_key}"
+                    ),
 
-    type="primary",
+                    type="primary",
 
-    use_container_width=True,
-):
+                    use_container_width=True,
+                ):
 
-    if not photos:
+                    if not photos:
 
-        st.warning(
-            "📷 Добавьте хотя бы одну "
-            "фотографию перед завершением ТТ."
-        )
+                        st.warning(
+                            "📷 Добавьте хотя бы одну "
+                            "фотографию перед завершением ТТ."
+                        )
 
-    else:
+                    else:
 
-        try:
+                        try:
 
-            new_visit = (
+                            new_visit = (
 
-                create_visit(
+                                create_visit(
 
-                    selected_date_string,
+                                    selected_date_string,
 
-                    worker,
+                                    worker,
 
-                    day,
+                                    day,
 
-                    route,
+                                    route,
 
-                    shop,
+                                    shop,
 
-                    address,
+                                    address,
 
-                    comment,
-                )
-            )
-
-
-            visit_id = (
-                new_visit["id"]
-            )
+                                    comment,
+                                )
+                            )
 
 
-            upload_visit_photos(
-
-                photos,
-
-                visit_id,
-            )
+                            visit_id = (
+                                new_visit["id"]
+                            )
 
 
-            clear_database_cache()
+                            upload_visit_photos(
+
+                                photos,
+
+                                visit_id,
+                            )
 
 
-            st.rerun()
+                            clear_database_cache()
 
 
-        except Exception as error:
+                            st.rerun()
 
 
-            st.error(
-                f"Ошибка сохранения: {error}"
-            )
+                        except Exception as error:
+
+                            st.error(
+                                f"Ошибка сохранения: {error}"
+                            )
 
 
             # =============================================
@@ -702,7 +700,6 @@ if st.button(
             # =============================================
 
             else:
-
 
                 st.success(
                     "🟢 ТТ пройдена"
