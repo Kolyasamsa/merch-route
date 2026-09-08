@@ -17,7 +17,9 @@ from database import (
     create_visit,
     upload_visit_photos,
     reset_visit,
+    update_visit_comment,
     clear_database_cache,
+
 )
 from utils import (
     MONTHS,
@@ -521,6 +523,7 @@ for route in routes:
                         )
 
 
+
             # =============================================
             # ПРОЙДЕНА
             # =============================================
@@ -532,6 +535,75 @@ for route in routes:
                 )
 
 
+                # =============================================
+                # РЕДАКТИРОВАНИЕ КОММЕНТАРИЯ
+                # =============================================
+
+                st.divider()
+
+                st.write(
+                    "💬 Комментарий"
+                )
+
+
+                edited_comment = st.text_area(
+
+                    "Комментарий к ТТ",
+
+                    value=visit.get(
+                        "comment",
+                        "",
+                    ),
+
+                    key=(
+                        f"edit_comment_"
+                        f"{visit['id']}"
+                    ),
+                )
+
+
+                if st.button(
+
+                    "💾 Сохранить комментарий",
+
+                    key=(
+                        f"save_comment_"
+                        f"{visit['id']}"
+                    ),
+
+                    use_container_width=True,
+                ):
+
+                    try:
+
+                        update_visit_comment(
+
+                            visit["id"],
+
+                            edited_comment,
+                        )
+
+
+                        st.success(
+                            "Комментарий сохранён!"
+                        )
+
+
+                        st.rerun()
+
+
+                    except Exception as error:
+
+                        st.error(
+                            f"Ошибка сохранения комментария: "
+                            f"{error}"
+                        )
+
+
+                # =============================================
+                # ВРЕМЯ ПРОХОЖДЕНИЯ
+                # =============================================
+
                 if visit.get(
                     "completed_at"
                 ):
@@ -540,20 +612,7 @@ for route in routes:
                         f"🕒 **Время:** "
                         f"{visit['completed_at']}"
                     )
-
-
-                if visit.get(
-                    "comment"
-                ):
-
-                    st.write(
-                        "💬 **Комментарий:**"
-                    )
-
-                    st.write(
-                        visit["comment"]
-                    )
-
+                    
 
                 # -----------------------------------------
                 # ФОТОГРАФИИ
