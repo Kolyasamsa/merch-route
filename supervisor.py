@@ -1,189 +1,542 @@
 from datetime import date
 import calendar
+from io import BytesIO
 
+import pandas as pd
 import streamlit as st
 
 from config import DAYS
 
 from routes import (
-    get_workers,
-    get_worker_data,
-    get_available_days,
-    get_routes_for_day,
+get_workers,
+get_worker_data,
+get_available_days,
+get_routes_for_day,
 )
 
 from database import (
-    get_completed_visits,
-    get_visit_photos,
-    get_completed_visits_for_period,
+get_completed_visits,
+get_visit_photos,
+get_completed_visits_for_period,
 )
 
 from utils import (
-    MONTHS,
-    get_point_key,
-    get_dates_for_weekday,
-    get_default_date,
+MONTHS,
+get_point_key,
+get_dates_for_weekday,
+get_default_date,
 )
 
-
 # =========================================================
+
 # ТАБЕЛЬ
+
 # =========================================================
 
 def show_timesheet(
-    df,
+df,
 ):
 
-    st.subheader(
-        "📊 Табель прохождений"
+```
+st.subheader(
+    "📊 Табель прохождений"
+)
+
+
+today = date.today()
+
+
+# =====================================================
+# ВЫБОР ГОДА И МЕСЯЦА
+# =====================================================
+
+col_year, col_month = st.columns(
+    2
+)
+
+
+with col_year:
+
+    year_options = [
+
+        today.year - 1,
+
+        today.year,
+
+        today.year + 1,
+    ]
+
+
+    year = st.selectbox(
+
+        "📅 Год",
+
+        year_options,
+
+        index=1,
+
+        key="timesheet_year",
     )
 
 
-    today = date.today()
+with col_month:
 
+    month_name = st.selectbox(
 
-    # =====================================================
-    # ВЫБОР ГОДА И МЕСЯЦА
-    # =====================================================
+        "📅 Месяц",
 
-    col_year, col_month = st.columns(
-        2
+        MONTHS,
+
+        index=today.month - 1,
+
+        key="timesheet_month",
     )
 
 
-    with col_year:
-
-        year_options = [
-
-            today.year - 1,
-
-            today.year,
-
-            today.year + 1,
-        ]
-
-
-        year = st.selectbox(
-
-            "📅 Год",
-
-            year_options,
-
-            index=1,
-
-            key="timesheet_year",
-        )
-
-
-    with col_month:
-
-        month_name = st.selectbox(
-
-            "📅 Месяц",
-
-            MONTHS,
-
-            index=today.month - 1,
-
-            key="timesheet_month",
-        )
-
-
-    month = (
-        MONTHS.index(
-            month_name
-        )
-        + 1
+month = (
+    MONTHS.index(
+        month_name
     )
+    \+ 1
+)
 
 
-    # =====================================================
-    # КОЛИЧЕСТВО ДНЕЙ В МЕСЯЦЕ
-    # =====================================================
+# =====================================================
+# КОЛИЧЕСТВО ДНЕЙ В МЕСЯЦЕ
+# =====================================================
 
-    days_in_month = (
+days_in_month = (
 
-        calendar.monthrange(
+    calendar.monthrange(
 
-            year,
+        year,
 
-            month,
+        month,
 
-        )[1]
+    )[1]
+)
+
+
+# =====================================================
+# НАЧАЛО И КОНЕЦ МЕСЯЦА
+# =====================================================
+
+start_date = (
+
+    date(
+
+        year,
+
+        month,
+
+        1,
+
     )
-
-
-    # =====================================================
-    # НАЧАЛО И КОНЕЦ МЕСЯЦА
-    # =====================================================
-
-    start_date = (
-
-        date(
-
-            year,
-
-            month,
-
-            1,
-
-        )
-        .strftime(
-            "%Y-%m-%d"
-        )
+    .strftime(
+        "%Y-%m-%d"
     )
+)
 
 
-    end_date = (
+end_date = (
 
-        date(
+    date(
 
-            year,
+        year,
 
-            month,
+        month,
 
-            days_in_month,
+        days_in_month,
 
-        )
-        .strftime(
-            "%Y-%m-%d"
+    )
+    .strftime(
+        "%Y-%m-%d"
+    )
+)
+
+
+# =====================================================
+# ПОЛУЧАЕМ ВСЕ ПРОХОЖДЕНИЯ ЗА МЕСЯЦ
+# =====================================================
+
+try:
+
+    visits = (
+
+        get_completed_visits_for_period(
+
+            start_date,
+
+            end_date,
+
         )
     )
 
 
-    # =====================================================
-    # ПОЛУЧАЕМ ВСЕ ПРОХОЖДЕНИЯ ЗА МЕСЯЦ
-    # =====================================================
+except Exception as error:
 
-    try:
+    st.error(
 
-        visits = (
+        f"Ошибка загрузки табеля: "
 
-            get_completed_visits_for_period(
+        f"{error}"
+    )
 
-                start_date,
+    return
 
-                end_date,
 
+# =====================================================
+# СПИСОК МЕРЧЕНДАЙЗЕРОВ
+# =====================================================
+
+workers = (
+
+    get_workers(
+        df
+    )
+)
+
+
+# =====================================================
+# СОЗДАЁМ БЫСТРЫЙ СЛОВАРЬ С ПОДСЧЁТОМ
+# =====================================================
+
+visit_counts = {}
+
+
+for visit in visits:
+
+
+    worker = (
+        visit["worker"]
+    )
+
+
+    visit_date = (
+        visit["visit_date"]
+    )
+
+
+    key = (
+
+        worker,
+
+        visit_date,
+    )
+
+
+    visit_counts[key] = (
+
+        visit_counts.get(
+
+            key,
+
+            0,
+
+        )
+
+        \+ 1
+    )
+
+
+# =====================================================
+# СОЗДАЁМ ТАБЕЛЬ
+# =====================================================
+
+table_data = []
+
+
+for worker in workers:
+
+
+    row = {
+
+        "Мерчендайзер":
+
+            worker,
+    }
+
+
+    total = 0
+
+
+    # -------------------------------------------------
+    # ВСЕ ДНИ МЕСЯЦА
+    # -------------------------------------------------
+
+    for day_number in range(
+
+        1,
+
+        days_in_month + 1,
+
+    ):
+
+
+        current_date = (
+
+            date(
+
+                year,
+
+                month,
+
+                day_number,
+
+            )
+            .strftime(
+                "%Y-%m-%d"
             )
         )
 
 
-    except Exception as error:
+        completed_count = (
 
-        st.error(
+            visit_counts.get(
 
-            f"Ошибка загрузки табеля: "
+                (
 
-            f"{error}"
+                    worker,
+
+                    current_date,
+
+                ),
+
+                0,
+            )
         )
 
-        return
+
+        column_name = (
+
+            f"{day_number:02d}."
+
+            f"{month_name[:3]}"
+        )
 
 
-    # =====================================================
-    # СПИСОК МЕРЧЕНДАЙЗЕРОВ
-    # =====================================================
+        row[
+            column_name
+        ] = (
+
+            completed_count
+        )
+
+
+        total += (
+
+            completed_count
+        )
+
+
+    # -------------------------------------------------
+    # ИТОГО
+    # -------------------------------------------------
+
+    row[
+        "Итого"
+    ] = total
+
+
+    table_data.append(
+        row
+    )
+
+
+# =====================================================
+# СОЗДАЁМ DATAFRAME
+# =====================================================
+
+timesheet_df = pd.DataFrame(
+    table_data
+)
+
+
+# =====================================================
+# ВЫВОД ТАБЕЛЯ
+# =====================================================
+
+st.dataframe(
+
+    timesheet_df,
+
+    use_container_width=True,
+
+    hide_index=True,
+)
+
+
+# =====================================================
+# ЭКСПОРТ В EXCEL
+# =====================================================
+
+excel_buffer = BytesIO()
+
+
+with pd.ExcelWriter(
+
+    excel_buffer,
+
+    engine="openpyxl",
+
+) as writer:
+
+
+    timesheet_df.to_excel(
+
+        writer,
+
+        index=False,
+
+        sheet_name="Табель",
+    )
+
+
+excel_data = (
+
+    excel_buffer.getvalue()
+)
+
+
+st.download_button(
+
+    label="⬇️ Скачать табель Excel",
+
+    data=excel_data,
+
+    file_name=(
+
+        f"Табель_"
+
+        f"{month_name}_"
+
+        f"{year}.xlsx"
+    ),
+
+    mime=(
+
+        "application/vnd.openxmlformats-"
+
+        "officedocument.spreadsheetml.sheet"
+    ),
+
+    use_container_width=True,
+)
+
+
+# =====================================================
+# ОБЩИЙ ИТОГ
+# =====================================================
+
+grand_total = sum(
+
+    row["Итого"]
+
+    for row
+    in table_data
+)
+
+
+st.divider()
+
+
+st.metric(
+
+    "📊 Всего пройдено ТТ за месяц",
+
+    grand_total,
+)
+```
+
+# =========================================================
+
+# КАБИНЕТ СУПЕРВАЙЗЕРА
+
+# =========================================================
+
+def show_supervisor_dashboard(
+
+```
+df,
+
+supervisor,
+
+logout,
+```
+
+):
+
+```
+# =====================================================
+# ЗАГОЛОВОК
+# =====================================================
+
+col_title, col_logout = (
+
+    st.columns(
+        [4, 1]
+    )
+)
+
+
+with col_title:
+
+    st.title(
+        "👩‍💼 Панель супервайзера"
+    )
+
+
+    st.caption(
+        f"👤 Супервайзер: {supervisor}"
+    )
+
+
+with col_logout:
+
+    st.write(
+        ""
+    )
+
+
+    if st.button(
+
+        "🚪 Выйти",
+
+        use_container_width=True,
+    ):
+
+        logout()
+
+
+# =====================================================
+# ВКЛАДКИ
+# =====================================================
+
+tab_routes, tab_timesheet = (
+
+    st.tabs(
+
+        [
+
+            "📍 Просмотр маршрутов",
+
+            "📊 Табель",
+
+        ]
+    )
+)
+
+
+# =====================================================
+# ВКЛАДКА ПРОСМОТРА МАРШРУТОВ
+# =====================================================
+
+with tab_routes:
+
+
+    # =================================================
+    # ВЫБОР МЕРЧЕНДАЙЗЕРА
+    # =================================================
 
     workers = (
 
@@ -193,585 +546,402 @@ def show_timesheet(
     )
 
 
-    # =====================================================
-    # СОЗДАЁМ БЫСТРЫЙ СЛОВАРЬ С ПОДСЧЁТОМ
-    # =====================================================
+    selected_worker = (
 
-    visit_counts = {}
+        st.selectbox(
 
+            "👤 Мерчендайзер",
 
-    for visit in visits:
+            workers,
 
-
-        worker = (
-            visit["worker"]
+            key="supervisor_worker",
         )
-
-
-        visit_date = (
-            visit["visit_date"]
-        )
-
-
-        key = (
-
-            worker,
-
-            visit_date,
-        )
-
-
-        visit_counts[key] = (
-
-            visit_counts.get(
-
-                key,
-
-                0,
-
-            )
-
-            + 1
-        )
-
-
-    # =====================================================
-    # СОЗДАЁМ ТАБЕЛЬ
-    # =====================================================
-
-    table_data = []
-
-
-    for worker in workers:
-
-
-        row = {
-
-            "Мерчендайзер":
-
-                worker,
-        }
-
-
-        total = 0
-
-
-        # -------------------------------------------------
-        # ВСЕ ДНИ МЕСЯЦА
-        # -------------------------------------------------
-
-        for day_number in range(
-
-            1,
-
-            days_in_month + 1,
-
-        ):
-
-
-            current_date = (
-
-                date(
-
-                    year,
-
-                    month,
-
-                    day_number,
-
-                )
-                .strftime(
-                    "%Y-%m-%d"
-                )
-            )
-
-
-            completed_count = (
-
-                visit_counts.get(
-
-                    (
-
-                        worker,
-
-                        current_date,
-
-                    ),
-
-                    0,
-                )
-            )
-
-
-            column_name = (
-
-                f"{day_number:02d}."
-
-                f"{month_name[:3]}"
-            )
-
-
-            row[
-                column_name
-            ] = (
-
-                completed_count
-            )
-
-
-            total += (
-
-                completed_count
-            )
-
-
-        # -------------------------------------------------
-        # ИТОГО
-        # -------------------------------------------------
-
-        row[
-            "Итого"
-        ] = total
-
-
-        table_data.append(
-            row
-        )
-
-
-    # =====================================================
-    # ВЫВОД ТАБЕЛЯ
-    # =====================================================
-
-    st.dataframe(
-
-        table_data,
-
-        use_container_width=True,
-
-        hide_index=True,
     )
 
 
-    # =====================================================
-    # ОБЩИЙ ИТОГ
-    # =====================================================
+    worker_data = (
 
-    grand_total = sum(
+        get_worker_data(
 
-        row["Итого"]
+            df,
 
-        for row
-        in table_data
+            selected_worker,
+        )
     )
 
+
+    available_days = (
+
+        get_available_days(
+
+            worker_data
+        )
+    )
+
+
+    # =================================================
+    # ВЫБОР ДНЯ
+    # =================================================
+
+    today = date.today()
+
+
+    today_day_index = (
+
+        today.weekday()
+    )
+
+
+    default_day = (
+
+        DAYS[today_day_index]
+
+        if (
+
+            today_day_index
+            < len(DAYS)
+
+            and
+
+            DAYS[today_day_index]
+            in available_days
+
+        )
+
+        else available_days[0]
+    )
+
+
+    day_index = (
+
+        available_days.index(
+
+            default_day
+
+        )
+
+        if default_day
+        in available_days
+
+        else 0
+    )
+
+
+    day = (
+
+        st.selectbox(
+
+            "📅 День маршрута",
+
+            available_days,
+
+            index=day_index,
+
+            key="supervisor_day",
+        )
+    )
+
+
+    # =================================================
+    # ВЫБОР ГОДА
+    # =================================================
+
+    year_options = [
+
+        today.year - 1,
+
+        today.year,
+
+        today.year + 1,
+    ]
+
+
+    year = (
+
+        st.selectbox(
+
+            "📅 Год",
+
+            year_options,
+
+            index=1,
+
+            key="supervisor_year",
+        )
+    )
+
+
+    # =================================================
+    # ВЫБОР МЕСЯЦА
+    # =================================================
+
+    month_name = (
+
+        st.selectbox(
+
+            "📅 Месяц",
+
+            MONTHS,
+
+            index=today.month - 1,
+
+            key="supervisor_month",
+        )
+    )
+
+
+    month = (
+
+        MONTHS.index(
+            month_name
+        )
+        \+ 1
+    )
+
+
+    # =================================================
+    # ДОСТУПНЫЕ ДАТЫ
+    # =================================================
+
+    available_dates = (
+
+        get_dates_for_weekday(
+
+            year,
+
+            month,
+
+            day,
+        )
+    )
+
+
+    default_date = (
+
+        get_default_date(
+            available_dates
+        )
+    )
+
+
+    selected_date = (
+
+        st.selectbox(
+
+            "📆 Дата маршрута",
+
+            available_dates,
+
+            index=available_dates.index(
+                default_date
+            ),
+
+            format_func=lambda value:
+
+                value.strftime(
+                    "%d.%m.%Y"
+                ),
+
+            key="supervisor_date",
+        )
+    )
+
+
+    selected_date_string = (
+
+        selected_date.strftime(
+            "%Y-%m-%d"
+        )
+    )
+
+
+    # =================================================
+    # МАРШРУТЫ НА ДЕНЬ
+    # =================================================
+
+    day_data, routes = (
+
+        get_routes_for_day(
+
+            worker_data,
+
+            day,
+        )
+    )
+
+
+    # =================================================
+    # ЗАГРУЖАЕМ ПРОЙДЕННЫЕ ТТ
+    # =================================================
+
+    try:
+
+        visits = (
+
+            get_completed_visits(
+
+                selected_date_string,
+
+                selected_worker,
+            )
+        )
+
+
+    except Exception as error:
+
+        st.error(
+
+            f"Ошибка загрузки "
+
+            f"прохождений: {error}"
+        )
+
+        visits = []
+
+
+    # =================================================
+    # СЛОВАРЬ ПРОЙДЕННЫХ ТТ
+    # =================================================
+
+    completed_visits = {
+
+        get_point_key(
+
+            visit["worker"],
+
+            visit["weekday"],
+
+            visit["route"],
+
+            visit["shop"],
+
+            visit["address"],
+        ): visit
+
+        for visit
+        in visits
+    }
+
+
+    # =================================================
+    # ОБЩАЯ ИНФОРМАЦИЯ
+    # =================================================
 
     st.divider()
 
 
-    st.metric(
-
-        "📊 Всего пройдено ТТ за месяц",
-
-        grand_total,
+    st.subheader(
+        f"👤 {selected_worker}"
     )
 
 
-# =========================================================
-# КАБИНЕТ СУПЕРВАЙЗЕРА
-# =========================================================
+    st.write(
 
-def show_supervisor_dashboard(
+        f"📅 **{day}, "
 
-    df,
-
-    supervisor,
-
-    logout,
-):
+        f"{selected_date.strftime('%d.%m.%Y')}**"
+    )
 
 
-    # =====================================================
-    # ЗАГОЛОВОК
-    # =====================================================
+    total_points = len(
+        day_data
+    )
 
-    col_title, col_logout = (
+
+    completed_points = sum(
+
+        get_point_key(
+
+            selected_worker,
+
+            day,
+
+            point["Маршрут"],
+
+            point["Магазин"],
+
+            point["Адрес"],
+        )
+
+        in completed_visits
+
+        for _, point
+        in day_data.iterrows()
+    )
+
+
+    col1, col2, col3 = (
 
         st.columns(
-            [4, 1]
+            3
         )
     )
 
 
-    with col_title:
+    col1.metric(
 
-        st.title(
-            "👩‍💼 Панель супервайзера"
-        )
+        "Всего ТТ",
 
-
-        st.caption(
-            f"👤 Супервайзер: {supervisor}"
-        )
+        total_points,
+    )
 
 
-    with col_logout:
+    col2.metric(
 
-        st.write(
-            ""
-        )
+        "Пройдено",
 
-
-        if st.button(
-
-            "🚪 Выйти",
-
-            use_container_width=True,
-        ):
-
-            logout()
+        completed_points,
+    )
 
 
-    # =====================================================
-    # ВКЛАДКИ
-    # =====================================================
+    col3.metric(
 
-    tab_routes, tab_timesheet = (
+        "Осталось",
 
-        st.tabs(
+        total_points
+        - completed_points,
+    )
 
-            [
 
-                "📍 Просмотр маршрутов",
+    st.progress(
 
-                "📊 Табель",
+        completed_points
+        / total_points
 
+        if total_points
+
+        else 0
+    )
+
+
+    # =================================================
+    # ВЫВОД МАРШРУТОВ
+    # =================================================
+
+    for route in routes:
+
+
+        route_data = (
+
+            day_data[
+
+                day_data[
+                    "Маршрут"
+                ]
+                == route
             ]
         )
-    )
 
 
-    # =====================================================
-    # ВКЛАДКА ПРОСМОТРА МАРШРУТОВ
-    # =====================================================
+        total_route_points = (
 
-    with tab_routes:
-
-
-        # =================================================
-        # ВЫБОР МЕРЧЕНДАЙЗЕРА
-        # =================================================
-
-        workers = (
-
-            get_workers(
-                df
+            len(
+                route_data
             )
         )
 
 
-        selected_worker = (
-
-            st.selectbox(
-
-                "👤 Мерчендайзер",
-
-                workers,
-
-                key="supervisor_worker",
-            )
-        )
-
-
-        worker_data = (
-
-            get_worker_data(
-
-                df,
-
-                selected_worker,
-            )
-        )
-
-
-        available_days = (
-
-            get_available_days(
-
-                worker_data
-            )
-        )
-
-
-        # =================================================
-        # ВЫБОР ДНЯ
-        # =================================================
-
-        today = date.today()
-
-
-        today_day_index = (
-
-            today.weekday()
-        )
-
-
-        default_day = (
-
-            DAYS[today_day_index]
-
-            if (
-
-                today_day_index
-                < len(DAYS)
-
-                and
-
-                DAYS[today_day_index]
-                in available_days
-
-            )
-
-            else available_days[0]
-        )
-
-
-        day_index = (
-
-            available_days.index(
-
-                default_day
-
-            )
-
-            if default_day
-            in available_days
-
-            else 0
-        )
-
-
-        day = (
-
-            st.selectbox(
-
-                "📅 День маршрута",
-
-                available_days,
-
-                index=day_index,
-
-                key="supervisor_day",
-            )
-        )
-
-
-        # =================================================
-        # ВЫБОР ГОДА
-        # =================================================
-
-        year_options = [
-
-            today.year - 1,
-
-            today.year,
-
-            today.year + 1,
-        ]
-
-
-        year = (
-
-            st.selectbox(
-
-                "📅 Год",
-
-                year_options,
-
-                index=1,
-
-                key="supervisor_year",
-            )
-        )
-
-
-        # =================================================
-        # ВЫБОР МЕСЯЦА
-        # =================================================
-
-        month_name = (
-
-            st.selectbox(
-
-                "📅 Месяц",
-
-                MONTHS,
-
-                index=today.month - 1,
-
-                key="supervisor_month",
-            )
-        )
-
-
-        month = (
-
-            MONTHS.index(
-                month_name
-            )
-            + 1
-        )
-
-
-        # =================================================
-        # ДОСТУПНЫЕ ДАТЫ
-        # =================================================
-
-        available_dates = (
-
-            get_dates_for_weekday(
-
-                year,
-
-                month,
-
-                day,
-            )
-        )
-
-
-        default_date = (
-
-            get_default_date(
-                available_dates
-            )
-        )
-
-
-        selected_date = (
-
-            st.selectbox(
-
-                "📆 Дата маршрута",
-
-                available_dates,
-
-                index=available_dates.index(
-                    default_date
-                ),
-
-                format_func=lambda value:
-
-                    value.strftime(
-                        "%d.%m.%Y"
-                    ),
-
-                key="supervisor_date",
-            )
-        )
-
-
-        selected_date_string = (
-
-            selected_date.strftime(
-                "%Y-%m-%d"
-            )
-        )
-
-
-        # =================================================
-        # МАРШРУТЫ НА ДЕНЬ
-        # =================================================
-
-        day_data, routes = (
-
-            get_routes_for_day(
-
-                worker_data,
-
-                day,
-            )
-        )
-
-
-        # =================================================
-        # ЗАГРУЖАЕМ ПРОЙДЕННЫЕ ТТ
-        # =================================================
-
-        try:
-
-            visits = (
-
-                get_completed_visits(
-
-                    selected_date_string,
-
-                    selected_worker,
-                )
-            )
-
-
-        except Exception as error:
-
-            st.error(
-
-                f"Ошибка загрузки "
-                f"прохождений: {error}"
-            )
-
-            visits = []
-
-
-        # =================================================
-        # СЛОВАРЬ ПРОЙДЕННЫХ ТТ
-        # =================================================
-
-        completed_visits = {
-
-            get_point_key(
-
-                visit["worker"],
-
-                visit["weekday"],
-
-                visit["route"],
-
-                visit["shop"],
-
-                visit["address"],
-            ): visit
-
-            for visit
-            in visits
-        }
-
-
-        # =================================================
-        # ОБЩАЯ ИНФОРМАЦИЯ
-        # =================================================
-
-        st.divider()
-
-
-        st.subheader(
-            f"👤 {selected_worker}"
-        )
-
-
-        st.write(
-
-            f"📅 **{day}, "
-
-            f"{selected_date.strftime('%d.%m.%Y')}**"
-        )
-
-
-        total_points = len(
-            day_data
-        )
-
-
-        completed_points = sum(
+        completed_route_points = sum(
 
             get_point_key(
 
@@ -779,7 +949,7 @@ def show_supervisor_dashboard(
 
                 day,
 
-                point["Маршрут"],
+                route,
 
                 point["Магазин"],
 
@@ -789,82 +959,76 @@ def show_supervisor_dashboard(
             in completed_visits
 
             for _, point
-            in day_data.iterrows()
+            in route_data.iterrows()
         )
 
 
-        col1, col2, col3 = (
-
-            st.columns(
-                3
-            )
-        )
+        st.divider()
 
 
-        col1.metric(
-
-            "Всего ТТ",
-
-            total_points,
-        )
-
-
-        col2.metric(
-
-            "Пройдено",
-
-            completed_points,
-        )
-
-
-        col3.metric(
-
-            "Осталось",
-
-            total_points
-            - completed_points,
+        st.subheader(
+            f"🚗 {route}"
         )
 
 
         st.progress(
 
-            completed_points
-            / total_points
+            completed_route_points
+            / total_route_points
 
-            if total_points
+            if total_route_points
 
             else 0
         )
 
 
-        # =================================================
-        # ВЫВОД МАРШРУТОВ
-        # =================================================
+        st.caption(
 
-        for route in routes:
+            f"Пройдено: "
+
+            f"{completed_route_points}"
+
+            f" / "
+
+            f"{total_route_points}"
+        )
 
 
-            route_data = (
+        # =============================================
+        # ТОРГОВЫЕ ТОЧКИ
+        # =============================================
 
-                day_data[
+        for number, (
 
-                    day_data[
-                        "Маршрут"
-                    ]
-                    == route
+            _,
+
+            point,
+
+        ) in enumerate(
+
+            route_data.iterrows(),
+
+            start=1,
+        ):
+
+
+            shop = (
+
+                point[
+                    "Магазин"
                 ]
             )
 
 
-            total_route_points = (
+            address = (
 
-                len(
-                    route_data
-                )
+                point[
+                    "Адрес"
+                ]
             )
 
 
-            completed_route_points = sum(
+            point_key = (
 
                 get_point_key(
 
@@ -874,330 +1038,244 @@ def show_supervisor_dashboard(
 
                     route,
 
-                    point["Магазин"],
+                    shop,
 
-                    point["Адрес"],
+                    address,
                 )
-
-                in completed_visits
-
-                for _, point
-                in route_data.iterrows()
             )
 
 
-            st.divider()
+            visit = (
 
-
-            st.subheader(
-                f"🚗 {route}"
+                completed_visits.get(
+                    point_key
+                )
             )
 
 
-            st.progress(
+            is_completed = (
 
-                completed_route_points
-                / total_route_points
-
-                if total_route_points
-
-                else 0
+                visit
+                is not None
             )
 
 
-            st.caption(
+            status = (
 
-                f"Пройдено: "
+                "🟢"
 
-                f"{completed_route_points}"
+                if is_completed
 
-                f" / "
-
-                f"{total_route_points}"
+                else "🔴"
             )
 
 
-            # =============================================
-            # ТОРГОВЫЕ ТОЧКИ
-            # =============================================
+            status_text = (
 
-            for number, (
+                "Пройдена"
 
-                _,
+                if is_completed
 
-                point,
+                else "Не пройдена"
+            )
 
-            ) in enumerate(
 
-                route_data.iterrows(),
+            with st.expander(
 
-                start=1,
+                f"{status} "
+
+                f"{number}. "
+
+                f"{shop} — "
+
+                f"{address} "
+
+                f"({status_text})"
             ):
 
 
-                shop = (
+                st.write(
 
-                    point[
-                        "Магазин"
-                    ]
+                    f"🏪 **Магазин:** "
+
+                    f"{shop}"
                 )
 
 
-                address = (
+                st.write(
 
-                    point[
-                        "Адрес"
-                    ]
+                    f"📍 **Адрес:** "
+
+                    f"{address}"
                 )
 
 
-                point_key = (
+                # =====================================
+                # НЕ ПРОЙДЕНА
+                # =====================================
 
-                    get_point_key(
-
-                        selected_worker,
-
-                        day,
-
-                        route,
-
-                        shop,
-
-                        address,
-                    )
-                )
+                if not is_completed:
 
 
-                visit = (
-
-                    completed_visits.get(
-                        point_key
-                    )
-                )
-
-
-                is_completed = (
-
-                    visit
-                    is not None
-                )
-
-
-                status = (
-
-                    "🟢"
-
-                    if is_completed
-
-                    else "🔴"
-                )
-
-
-                status_text = (
-
-                    "Пройдена"
-
-                    if is_completed
-
-                    else "Не пройдена"
-                )
-
-
-                with st.expander(
-
-                    f"{status} "
-
-                    f"{number}. "
-
-                    f"{shop} — "
-
-                    f"{address} "
-
-                    f"({status_text})"
-                ):
-
-
-                    st.write(
-
-                        f"🏪 **Магазин:** "
-
-                        f"{shop}"
+                    st.error(
+                        "🔴 ТТ не пройдена"
                     )
 
 
-                    st.write(
+                # =====================================
+                # ПРОЙДЕНА
+                # =====================================
 
-                        f"📍 **Адрес:** "
+                else:
 
-                        f"{address}"
+
+                    st.success(
+                        "🟢 ТТ пройдена"
                     )
 
 
-                    # =====================================
-                    # НЕ ПРОЙДЕНА
-                    # =====================================
+                    # ---------------------------------
+                    # ВРЕМЯ
+                    # ---------------------------------
 
-                    if not is_completed:
+                    if visit.get(
+                        "completed_at"
+                    ):
 
 
-                        st.error(
-                            "🔴 ТТ не пройдена"
+                        st.write(
+
+                            f"🕒 **Время:** "
+
+                            f"{visit['completed_at']}"
                         )
 
 
-                    # =====================================
-                    # ПРОЙДЕНА
-                    # =====================================
+                    # ---------------------------------
+                    # КОММЕНТАРИЙ
+                    # ---------------------------------
+
+                    comment = (
+
+                        visit.get(
+
+                            "comment",
+
+                            "",
+                        )
+                    )
+
+
+                    st.divider()
+
+
+                    st.write(
+                        "💬 **Комментарий:**"
+                    )
+
+
+                    if comment:
+
+
+                        st.write(
+                            comment
+                        )
+
 
                     else:
 
 
-                        st.success(
-                            "🟢 ТТ пройдена"
+                        st.caption(
+                            "Комментарий отсутствует"
                         )
 
 
-                        # ---------------------------------
-                        # ВРЕМЯ
-                        # ---------------------------------
+                    # ---------------------------------
+                    # ФОТОГРАФИИ
+                    # ---------------------------------
 
-                        if visit.get(
-                            "completed_at"
-                        ):
+                    st.divider()
+
+
+                    try:
+
+
+                        photos = (
+
+                            get_visit_photos(
+
+                                visit["id"]
+                            )
+                        )
+
+
+                        if photos:
 
 
                             st.write(
-
-                                f"🕒 **Время:** "
-
-                                f"{visit['completed_at']}"
+                                "📷 **Фотографии:**"
                             )
 
 
-                        # ---------------------------------
-                        # КОММЕНТАРИЙ
-                        # ---------------------------------
+                            columns = (
 
-                        comment = (
-
-                            visit.get(
-
-                                "comment",
-
-                                "",
+                                st.columns(
+                                    3
+                                )
                             )
-                        )
 
 
-                        st.divider()
+                            for index, photo in enumerate(
+
+                                photos
+                            ):
 
 
-                        st.write(
-                            "💬 **Комментарий:**"
-                        )
+                                with columns[
+
+                                    index % 3
+
+                                ]:
 
 
-                        if comment:
+                                    st.image(
 
+                                        photo[
+                                            "public_url"
+                                        ],
 
-                            st.write(
-                                comment
-                            )
+                                        use_container_width=True,
+                                    )
 
 
                         else:
 
 
-                            st.caption(
-                                "Комментарий отсутствует"
+                            st.info(
+                                "Фотографии отсутствуют."
                             )
 
 
-                        # ---------------------------------
-                        # ФОТОГРАФИИ
-                        # ---------------------------------
-
-                        st.divider()
+                    except Exception as error:
 
 
-                        try:
+                        st.warning(
+
+                            f"Не удалось "
+
+                            f"загрузить фотографии: "
+
+                            f"{error}"
+                        )
 
 
-                            photos = (
+# =====================================================
+# ВКЛАДКА ТАБЕЛЯ
+# =====================================================
 
-                                get_visit_photos(
+with tab_timesheet:
 
-                                    visit["id"]
-                                )
-                            )
-
-
-                            if photos:
-
-
-                                st.write(
-                                    "📷 **Фотографии:**"
-                                )
-
-
-                                columns = (
-
-                                    st.columns(
-                                        3
-                                    )
-                                )
-
-
-                                for index, photo in enumerate(
-
-                                    photos
-                                ):
-
-
-                                    with columns[
-
-                                        index % 3
-
-                                    ]:
-
-
-                                        st.image(
-
-                                            photo[
-                                                "public_url"
-                                            ],
-
-                                            use_container_width=True,
-                                        )
-
-
-                            else:
-
-
-                                st.info(
-                                    "Фотографии отсутствуют."
-                                )
-
-
-                        except Exception as error:
-
-
-                            st.warning(
-
-                                f"Не удалось "
-
-                                f"загрузить фотографии: "
-
-                                f"{error}"
-                            )
-
-
-    # =====================================================
-    # ВКЛАДКА ТАБЕЛЯ
-    # =====================================================
-
-    with tab_timesheet:
-
-        show_timesheet(
-            df
-        )
+    show_timesheet(
+        df
+    )
+```
