@@ -1,4 +1,3 @@
-```python
 import uuid
 from datetime import datetime
 
@@ -236,4 +235,3 @@ def clear_database_cache():
 
     get_completed_visits.clear()
     get_visit_photos.clear()
-```
