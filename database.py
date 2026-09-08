@@ -1,4 +1,3 @@
-```python
 import uuid
 from datetime import datetime
 from io import BytesIO
@@ -493,4 +492,3 @@ def clear_database_cache():
     get_completed_visits.clear()
 
     get_visit_photos.clear()
-```
