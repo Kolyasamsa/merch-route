@@ -5,419 +5,544 @@ from io import BytesIO
 import streamlit as st
 
 from PIL import (
-Image,
-ImageOps,
+    Image,
+    ImageOps,
 )
 
 from config import (
-supabase,
-STORAGE_BUCKET,
+    supabase,
+    STORAGE_BUCKET,
 )
 
+
 # =========================================================
-
-# ПОЛУЧЕНИЕ ФОТОГРАФИЙ
-
+# ПОЛУЧЕНИЕ ФОТОГРАФИЙ ТТ
 # =========================================================
 
 @st.cache_data(ttl=10)
 def get_visit_photos(
-visit_id,
+
+    visit_id,
+
 ):
 
-```
-response = (
-    supabase
-    .table("point_photos")
-    .select("*")
-    .eq(
-        "visit_id",
-        str(visit_id),
-    )
-    .order(
-        "created_at"
-    )
-    .execute()
-)
+    response = (
 
-return response.data
-```
+        supabase
+        .table(
+            "point_photos"
+        )
+        .select("*")
+        .eq(
+
+            "visit_id",
+            str(visit_id),
+
+        )
+        .order(
+            "created_at"
+        )
+        .execute()
+
+    )
+
+
+    return response.data
+
 
 # =========================================================
-
 # ЗАГРУЗКА И СЖАТИЕ ОДНОЙ ФОТОГРАФИИ
-
 # =========================================================
 
 def upload_visit_photo(
-uploaded_file,
-visit_id,
+
+    uploaded_file,
+    visit_id,
+
 ):
 
-```
-# -----------------------------------------------------
-# ОТКРЫВАЕМ
-# -----------------------------------------------------
+    # -----------------------------------------------------
+    # ОТКРЫВАЕМ ИЗОБРАЖЕНИЕ
+    # -----------------------------------------------------
 
-image = Image.open(
-    BytesIO(
-        uploaded_file.getvalue()
+    image = Image.open(
+
+        BytesIO(
+            uploaded_file.getvalue()
+        )
+
     )
-)
 
 
-# -----------------------------------------------------
-# ИСПРАВЛЯЕМ ORIENTATION
-# -----------------------------------------------------
+    # -----------------------------------------------------
+    # ИСПРАВЛЯЕМ ОРИЕНТАЦИЮ
+    # -----------------------------------------------------
 
-image = (
-    ImageOps.exif_transpose(
+    image = ImageOps.exif_transpose(
         image
     )
-)
 
 
-# -----------------------------------------------------
-# RGB
-# -----------------------------------------------------
+    # -----------------------------------------------------
+    # RGB
+    # -----------------------------------------------------
 
-if image.mode != "RGB":
+    if image.mode != "RGB":
 
-    if image.mode == "RGBA":
 
-        background = Image.new(
-            "RGB",
-            image.size,
-            "white",
+        if image.mode == "RGBA":
+
+
+            background = Image.new(
+
+                "RGB",
+
+                image.size,
+
+                "white",
+
+            )
+
+
+            background.paste(
+
+                image,
+
+                mask=image.getchannel(
+                    "A"
+                ),
+
+            )
+
+
+            image = background
+
+
+        else:
+
+            image = image.convert(
+                "RGB"
+            )
+
+
+    # -----------------------------------------------------
+    # УМЕНЬШЕНИЕ РАЗРЕШЕНИЯ
+    # -----------------------------------------------------
+
+    max_size = (
+
+        2560,
+
+        2560,
+
+    )
+
+
+    image.thumbnail(
+
+        max_size,
+
+        Image.Resampling.LANCZOS,
+
+    )
+
+
+    # -----------------------------------------------------
+    # СОХРАНЕНИЕ В ПАМЯТЬ
+    # -----------------------------------------------------
+
+    image_buffer = BytesIO()
+
+
+    image.save(
+
+        image_buffer,
+
+        format="JPEG",
+
+        quality=85,
+
+        optimize=True,
+
+    )
+
+
+    image_bytes = (
+
+        image_buffer
+        .getvalue()
+
+    )
+
+
+    # -----------------------------------------------------
+    # ИМЯ ФАЙЛА
+    # -----------------------------------------------------
+
+    file_name = (
+
+        f"{uuid.uuid4()}.jpg"
+
+    )
+
+
+    file_path = (
+
+        f"visits/"
+        f"{visit_id}/"
+        f"{file_name}"
+
+    )
+
+
+    # -----------------------------------------------------
+    # ЗАГРУЗКА В STORAGE
+    # -----------------------------------------------------
+
+    supabase.storage.from_(
+
+        STORAGE_BUCKET
+
+    ).upload(
+
+        path=file_path,
+
+        file=image_bytes,
+
+        file_options={
+
+            "content-type":
+                "image/jpeg",
+
+        },
+
+    )
+
+
+    # -----------------------------------------------------
+    # PUBLIC URL
+    # -----------------------------------------------------
+
+    public_url = (
+
+        supabase
+        .storage
+        .from_(
+
+            STORAGE_BUCKET
+
+        )
+        .get_public_url(
+
+            file_path
+
         )
 
-        background.paste(
-            image,
-            mask=image.getchannel(
-                "A"
-            ),
-        )
-
-        image = background
-
-    else:
-
-        image = image.convert(
-            "RGB"
-        )
+    )
 
 
-# -----------------------------------------------------
-# УМЕНЬШЕНИЕ РАЗМЕРА
-# -----------------------------------------------------
+    # -----------------------------------------------------
+    # СОХРАНЯЕМ В БАЗУ
+    # -----------------------------------------------------
 
-image.thumbnail(
+    photo_data = {
+
+        "visit_id":
+            str(visit_id),
+
+        "file_path":
+            file_path,
+
+        "public_url":
+            public_url,
+
+    }
+
 
     (
-        2560,
-        2560,
-    ),
 
-    Image.Resampling.LANCZOS,
-)
+        supabase
+        .table(
 
+            "point_photos"
 
-# -----------------------------------------------------
-# СЖАТИЕ
-# -----------------------------------------------------
+        )
+        .insert(
 
-image_buffer = (
-    BytesIO()
-)
+            photo_data
 
+        )
+        .execute()
 
-image.save(
-
-    image_buffer,
-
-    format="JPEG",
-
-    quality=85,
-
-    optimize=True,
-)
-
-
-image_bytes = (
-    image_buffer.getvalue()
-)
-
-
-# -----------------------------------------------------
-# ПУТЬ
-# -----------------------------------------------------
-
-file_name = (
-    f"{uuid.uuid4()}.jpg"
-)
-
-
-file_path = (
-    f"visits/"
-    f"{visit_id}/"
-    f"{file_name}"
-)
-
-
-# -----------------------------------------------------
-# STORAGE
-# -----------------------------------------------------
-
-supabase.storage.from_(
-    STORAGE_BUCKET
-).upload(
-
-    path=file_path,
-
-    file=image_bytes,
-
-    file_options={
-        "content-type": "image/jpeg",
-    },
-)
-
-
-# -----------------------------------------------------
-# PUBLIC URL
-# -----------------------------------------------------
-
-public_url = (
-    supabase
-    .storage
-    .from_(
-        STORAGE_BUCKET
     )
-    .get_public_url(
-        file_path
-    )
-)
 
 
-# -----------------------------------------------------
-# БАЗА
-# -----------------------------------------------------
-
-photo_data = {
-
-    "visit_id": str(
-        visit_id
-    ),
-
-    "file_path": file_path,
-
-    "public_url": public_url,
-}
+    clear_photos_cache()
 
 
-(
-    supabase
-    .table("point_photos")
-    .insert(
-        photo_data
-    )
-    .execute()
-)
+    return photo_data
 
-
-get_visit_photos.clear()
-
-
-return photo_data
-```
 
 # =========================================================
-
 # ЗАГРУЗКА НЕСКОЛЬКИХ ФОТО
-
 # =========================================================
 
 def upload_visit_photos(
-files,
-visit_id,
+
+    files,
+    visit_id,
+
 ):
 
-```
-if not files:
+    if not files:
 
-    return []
-
-
-uploaded = []
+        return []
 
 
-for file in files:
+    uploaded = []
 
-    photo = (
-        upload_visit_photo(
-            file,
-            visit_id,
+
+    for file in files:
+
+
+        photo = (
+
+            upload_visit_photo(
+
+                file,
+
+                visit_id,
+
+            )
+
         )
-    )
-
-    uploaded.append(
-        photo
-    )
 
 
-get_visit_photos.clear()
+        uploaded.append(
+            photo
+        )
 
 
-return uploaded
-```
+    return uploaded
+
 
 # =========================================================
-
-# ЗАМЕНА ФОТО
-
+# ЗАМЕНА ФОТОГРАФИЙ
 # =========================================================
 
 def replace_visit_photos(
-files,
-visit_id,
+
+    files,
+    visit_id,
+
 ):
 
-```
-# -----------------------------------------------------
-# ПОЛУЧАЕМ СТАРЫЕ
-# -----------------------------------------------------
+    # Получаем старые фотографии
 
-response = (
-    supabase
-    .table("point_photos")
-    .select("*")
-    .eq(
-        "visit_id",
-        str(visit_id),
-    )
-    .execute()
-)
+    photos_response = (
 
+        supabase
+        .table(
 
-old_photos = (
-    response.data
-    or []
-)
+            "point_photos"
 
+        )
+        .select("*")
+        .eq(
 
-# -----------------------------------------------------
-# УДАЛЯЕМ ФАЙЛЫ
-# -----------------------------------------------------
+            "visit_id",
 
-old_file_paths = [
+            str(visit_id),
 
-    photo["file_path"]
+        )
+        .execute()
 
-    for photo
-    in old_photos
-]
-
-
-if old_file_paths:
-
-    supabase.storage.from_(
-        STORAGE_BUCKET
-    ).remove(
-        old_file_paths
     )
 
 
-# -----------------------------------------------------
-# УДАЛЯЕМ ЗАПИСИ
-# -----------------------------------------------------
+    old_photos = (
 
-(
-    supabase
-    .table("point_photos")
-    .delete()
-    .eq(
-        "visit_id",
-        str(visit_id),
+        photos_response.data
+
+        or []
+
     )
-    .execute()
-)
 
 
-# -----------------------------------------------------
-# ЗАГРУЖАЕМ НОВЫЕ
-# -----------------------------------------------------
+    # Пути файлов
 
-uploaded_photos = (
-    upload_visit_photos(
-        files,
-        visit_id,
+    old_file_paths = [
+
+        photo[
+            "file_path"
+        ]
+
+        for photo
+
+        in old_photos
+
+    ]
+
+
+    # Удаляем из Storage
+
+    if old_file_paths:
+
+
+        supabase.storage.from_(
+
+            STORAGE_BUCKET
+
+        ).remove(
+
+            old_file_paths
+
+        )
+
+
+    # Удаляем записи из БД
+
+    (
+
+        supabase
+        .table(
+
+            "point_photos"
+
+        )
+        .delete()
+        .eq(
+
+            "visit_id",
+
+            str(visit_id),
+
+        )
+        .execute()
+
     )
-)
 
 
-get_visit_photos.clear()
+    # Загружаем новые
+
+    uploaded_photos = (
+
+        upload_visit_photos(
+
+            files,
+
+            visit_id,
+
+        )
+
+    )
 
 
-return uploaded_photos
-```
+    clear_photos_cache()
+
+
+    return uploaded_photos
+
 
 # =========================================================
-
 # УДАЛЕНИЕ ВСЕХ ФОТО ТТ
-
 # =========================================================
 
 def delete_visit_photos(
-visit_id,
+
+    visit_id,
+
 ):
 
-```
-response = (
-    supabase
-    .table("point_photos")
-    .select("*")
-    .eq(
-        "visit_id",
-        str(visit_id),
-    )
-    .execute()
-)
+    photos_response = (
 
+        supabase
+        .table(
 
-photos = (
-    response.data
-    or []
-)
+            "point_photos"
 
+        )
+        .select("*")
+        .eq(
 
-file_paths = [
+            "visit_id",
 
-    photo["file_path"]
+            str(visit_id),
 
-    for photo
-    in photos
-]
+        )
+        .execute()
 
-
-if file_paths:
-
-    supabase.storage.from_(
-        STORAGE_BUCKET
-    ).remove(
-        file_paths
     )
 
 
-(
-    supabase
-    .table("point_photos")
-    .delete()
-    .eq(
-        "visit_id",
-        str(visit_id),
+    photos = (
+
+        photos_response.data
+
+        or []
+
     )
-    .execute()
-)
 
 
-get_visit_photos.clear()
-```
+    file_paths = [
+
+        photo[
+            "file_path"
+        ]
+
+        for photo
+
+        in photos
+
+    ]
+
+
+    # Удаляем файлы
+
+    if file_paths:
+
+
+        supabase.storage.from_(
+
+            STORAGE_BUCKET
+
+        ).remove(
+
+            file_paths
+
+        )
+
+
+    # Удаляем записи
+
+    (
+
+        supabase
+        .table(
+
+            "point_photos"
+
+        )
+        .delete()
+        .eq(
+
+            "visit_id",
+
+            str(visit_id),
+
+        )
+        .execute()
+
+    )
+
+
+    clear_photos_cache()
+
+
+# =========================================================
+# ОЧИСТКА КЭША
+# =========================================================
+
+def clear_photos_cache():
+
+    get_visit_photos.clear()
