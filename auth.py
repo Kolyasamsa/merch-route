@@ -2,6 +2,10 @@ import streamlit as st
 
 
 def get_worker_by_password(password):
+    """
+    Возвращает имя мерчендайзера,
+    которому принадлежит введённый пароль.
+    """
 
     workers = st.secrets.get(
         "workers",
@@ -18,26 +22,35 @@ def get_worker_by_password(password):
 
 
 def login():
+    """
+    Показывает экран входа.
 
-    # Пользователь уже вошёл
-    if st.session_state.get("worker"):
+    Если пользователь уже вошёл —
+    возвращает его имя.
+
+    Если ещё не вошёл —
+    показывает поле пароля.
+    """
+
+    # Проверяем, есть ли уже авторизованный пользователь
+    if "worker" in st.session_state:
 
         return st.session_state["worker"]
 
 
+    # Экран входа
     st.title(
         "📍 Маршруты мерчендайзеров"
     )
 
-    st.write(
-        "Войдите, чтобы открыть свои маршруты."
+    st.caption(
+        "Введите свой пароль"
     )
 
 
     password = st.text_input(
         "🔐 Пароль",
         type="password",
-        key="login_password",
     )
 
 
@@ -63,12 +76,9 @@ def login():
 
         if worker:
 
-            st.session_state["worker"] = worker
-
-            # Убираем пароль из session_state
-            st.session_state.pop(
-                "login_password",
-                None,
+            # Запоминаем вошедшего мерчендайзера
+            st.session_state["worker"] = (
+                worker
             )
 
             st.rerun()
@@ -85,14 +95,12 @@ def login():
 
 
 def logout():
+    """
+    Выход из аккаунта.
+    """
 
     st.session_state.pop(
         "worker",
-        None,
-    )
-
-    st.session_state.pop(
-        "login_password",
         None,
     )
 
