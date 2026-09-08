@@ -9,6 +9,10 @@ from config import (
 )
 
 
+# =========================================================
+# ПОЛУЧЕНИЕ ПРОЙДЕННЫХ ТТ
+# =========================================================
+
 @st.cache_data(ttl=10)
 def get_completed_visits(
     visit_date,
@@ -27,8 +31,14 @@ def get_completed_visits(
     return response.data
 
 
+# =========================================================
+# ПОЛУЧЕНИЕ ФОТОГРАФИЙ ТТ
+# =========================================================
+
 @st.cache_data(ttl=10)
-def get_visit_photos(visit_id):
+def get_visit_photos(
+    visit_id,
+):
 
     response = (
         supabase
@@ -41,6 +51,10 @@ def get_visit_photos(visit_id):
 
     return response.data
 
+
+# =========================================================
+# СОЗДАНИЕ ПРОХОЖДЕНИЯ ТТ
+# =========================================================
 
 def create_visit(
     visit_date,
@@ -79,6 +93,10 @@ def create_visit(
 
     return response.data[0]
 
+
+# =========================================================
+# ЗАГРУЗКА ОДНОЙ ФОТОГРАФИИ
+# =========================================================
 
 def upload_visit_photo(
     uploaded_file,
@@ -134,6 +152,10 @@ def upload_visit_photo(
     return photo_data
 
 
+# =========================================================
+# ЗАГРУЗКА НЕСКОЛЬКИХ ФОТОГРАФИЙ
+# =========================================================
+
 def upload_visit_photos(
     files,
     visit_id,
@@ -152,15 +174,22 @@ def upload_visit_photos(
             visit_id,
         )
 
-        uploaded.append(photo)
+        uploaded.append(
+            photo
+        )
 
     return uploaded
 
+
+# =========================================================
+# СБРОС ПРОХОЖДЕНИЯ ТТ
+# =========================================================
 
 def reset_visit(
     visit_id,
 ):
 
+    # Получаем фотографии ТТ
     photos_response = (
         supabase
         .table("point_photos")
@@ -174,17 +203,22 @@ def reset_visit(
         or []
     )
 
+    # Получаем пути файлов
     file_paths = [
         photo["file_path"]
         for photo in photos
     ]
 
+    # Удаляем файлы из Storage
     if file_paths:
 
         supabase.storage.from_(
             STORAGE_BUCKET
-        ).remove(file_paths)
+        ).remove(
+            file_paths
+        )
 
+    # Удаляем записи о фотографиях
     (
         supabase
         .table("point_photos")
@@ -193,6 +227,7 @@ def reset_visit(
         .execute()
     )
 
+    # Удаляем прохождение ТТ
     (
         supabase
         .table("point_visits")
@@ -213,7 +248,7 @@ def update_visit_comment(
     comment,
 ):
 
-    (
+    response = (
         supabase
         .table("point_visits")
         .update(
@@ -228,10 +263,23 @@ def update_visit_comment(
         .execute()
     )
 
+    if not response.data:
+
+        raise RuntimeError(
+            "Комментарий не был обновлён."
+        )
+
     clear_database_cache()
 
+    return response.data[0]
+
+
+# =========================================================
+# ОЧИСТКА КЭША
+# =========================================================
 
 def clear_database_cache():
 
     get_completed_visits.clear()
+
     get_visit_photos.clear()
