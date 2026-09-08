@@ -1,4 +1,3 @@
-```python
 from datetime import date
 
 import streamlit as st
@@ -672,4 +671,3 @@ col3.metric(
     "Осталось",
     total_points - completed_points,
 )
-```
