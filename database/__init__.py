@@ -32,6 +32,12 @@ from database.comments import (
 
     create_visit_comment,
 
+    get_unread_comments_for_worker,
+
+    get_unread_comments_for_supervisor,
+
+    mark_comment_as_read,
+
 )
 
 
