@@ -625,61 +625,76 @@ for route in routes:
                 )
 
 
-                if st.button(
+if st.button(
 
-                    "✓ ЗАВЕРШИТЬ ТТ",
+    "✓ ЗАВЕРШИТЬ ТТ",
 
-                    key=(
-                        f"complete_{point_key}"
-                    ),
+    key=(
+        f"complete_{point_key}"
+    ),
 
-                    type="primary",
+    type="primary",
 
-                    use_container_width=True,
-                ):
+    use_container_width=True,
+):
 
+    if not photos:
 
-                    try:
+        st.warning(
+            "📷 Добавьте хотя бы одну "
+            "фотографию перед завершением ТТ."
+        )
 
+    else:
 
-                        new_visit = (
+        try:
 
-                            create_visit(
+            new_visit = (
 
-                                selected_date_string,
+                create_visit(
 
-                                worker,
+                    selected_date_string,
 
-                                day,
+                    worker,
 
-                                route,
+                    day,
 
-                                shop,
+                    route,
 
-                                address,
+                    shop,
 
-                                comment,
-                            )
-                        )
+                    address,
 
-
-                        visit_id = (
-                            new_visit["id"]
-                        )
-
-
-                        upload_visit_photos(
-
-                            photos,
-
-                            visit_id,
-                        )
+                    comment,
+                )
+            )
 
 
-                        clear_database_cache()
+            visit_id = (
+                new_visit["id"]
+            )
 
 
-                        st.rerun()
+            upload_visit_photos(
+
+                photos,
+
+                visit_id,
+            )
+
+
+            clear_database_cache()
+
+
+            st.rerun()
+
+
+        except Exception as error:
+
+
+            st.error(
+                f"Ошибка сохранения: {error}"
+            )
 
 
                     except Exception as error:
