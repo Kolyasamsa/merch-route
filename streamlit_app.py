@@ -898,14 +898,6 @@ for route in routes:
                             )
 
 
-                            created_at = (
-                                visit_comment.get(
-                                    "created_at",
-                                    "",
-                                )
-                            )
-
-
                             if author_role == "supervisor":
 
                                 st.markdown(
@@ -922,13 +914,6 @@ for route in routes:
                             st.write(
                                 comment_text
                             )
-
-
-                            if created_at:
-
-                                st.caption(
-                                    f"🕒 {created_at}"
-                                )
 
 
                             st.divider()
