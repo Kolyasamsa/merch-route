@@ -1,4 +1,5 @@
 from datetime import date
+from html import escape
 
 import streamlit as st
 
@@ -42,8 +43,88 @@ from utils import (
 st.set_page_config(
     page_title="Маршруты мерчендайзеров",
     page_icon="📍",
-    layout="wide",
+    layout="centered",
 )
+
+
+st.markdown(
+    """
+    <style>
+    .stMainBlockContainer {
+        max-width: 980px;
+        padding-top: 2rem;
+        padding-bottom: 3rem;
+    }
+
+    div[data-testid="stExpander"] {
+        border: 1px solid rgba(128, 128, 128, 0.22);
+        border-radius: 16px;
+        margin-bottom: 12px;
+        overflow: hidden;
+    }
+
+    div[data-testid="stExpander"] details summary {
+        padding: 0.85rem 1rem;
+    }
+
+    .photo-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 10px;
+        margin: 8px 0 14px 0;
+    }
+
+    .photo-thumb {
+        display: block;
+        width: 100%;
+        aspect-ratio: 4 / 3;
+        overflow: hidden;
+        border-radius: 12px;
+        border: 1px solid rgba(128, 128, 128, 0.22);
+        background: rgba(128, 128, 128, 0.08);
+        transition: transform 0.15s ease, box-shadow 0.15s ease;
+    }
+
+    .photo-thumb:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 18px rgba(0, 0, 0, 0.14);
+    }
+
+    .photo-thumb img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        display: block;
+    }
+
+    @media (max-width: 700px) {
+        .photo-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
+
+def render_photo_grid(photos):
+    if not photos:
+        return
+
+    items = []
+    for photo in photos:
+        url = escape(photo["public_url"], quote=True)
+        items.append(
+            f'<a class="photo-thumb" href="{url}" target="_blank" rel="noopener noreferrer">'
+            f'<img src="{url}" loading="lazy" />'
+            f'</a>'
+        )
+
+    st.markdown(
+        '<div class="photo-grid">' + ''.join(items) + '</div>',
+        unsafe_allow_html=True,
+    )
 
 
 user_name, user_role = login()
@@ -553,21 +634,7 @@ for route in routes:
 
                         if saved_photos:
 
-                            columns = st.columns(3)
-
-
-                            for index, photo in enumerate(
-                                saved_photos
-                            ):
-
-                                with columns[
-                                    index % 3
-                                ]:
-
-                                    st.image(
-                                        photo["public_url"],
-                                        use_container_width=True,
-                                    )
+                            render_photo_grid(saved_photos)
 
                         else:
 
@@ -606,21 +673,7 @@ for route in routes:
                             )
 
 
-                            columns = st.columns(3)
-
-
-                            for index, photo in enumerate(
-                                saved_photos
-                            ):
-
-                                with columns[
-                                    index % 3
-                                ]:
-
-                                    st.image(
-                                        photo["public_url"],
-                                        use_container_width=True,
-                                    )
+                            render_photo_grid(saved_photos)
 
 
                         new_photos = st.file_uploader(
