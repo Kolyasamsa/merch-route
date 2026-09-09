@@ -1,7 +1,9 @@
 from datetime import date
 import streamlit as st
-import re
-import html
+
+@st.dialog("📷 Фотография", width="large")
+def show_photo_dialog(photo_url):
+    st.image(photo_url, use_container_width=True)
 
 
 from auth import login, logout
@@ -77,7 +79,6 @@ st.markdown(
 
     .photo-thumb {
         display: block;
-        cursor: pointer;
         width: 100%;
         aspect-ratio: 4 / 3;
         overflow: hidden;
@@ -114,142 +115,27 @@ def render_photo_grid(photos, key_prefix="photo"):
     if not photos:
         return
 
-    safe_prefix = re.sub(r"[^a-zA-Z0-9_-]", "_", str(key_prefix))
-    overlay_id = f"photo_overlay_{safe_prefix}"
-    image_id = f"photo_full_{safe_prefix}"
+    columns = st.columns(3)
 
-    cards = []
     for index, photo in enumerate(photos):
-        url = str(photo["public_url"])
-        url_attr = html.escape(url, quote=True)
-        url_js = json.dumps(url)
-        cards.append(
-            f'<button type="button" class="photo-card" '
-            f'onclick="openPhoto_{safe_prefix}({html.escape(url_js, quote=True)})">'
-            f'<img src="{url_attr}" loading="lazy" alt="Фото {index + 1}" />'
-            f'</button>'
-        )
+        with columns[index % 3]:
+            st.image(
+                photo["public_url"],
+                use_container_width=True,
+            )
 
-    gallery = f"""
-    <style>
-      .photo-gallery-{safe_prefix} {{
-          display: grid;
-          grid-template-columns: repeat(3, minmax(0, 1fr));
-          gap: 10px;
-          width: 100%;
-          margin: 8px 0 14px;
-      }}
-      .photo-gallery-{safe_prefix} .photo-card {{
-          padding: 0;
-          border: 1px solid rgba(128,128,128,.22);
-          background: rgba(128,128,128,.08);
-          border-radius: 12px;
-          overflow: hidden;
-          cursor: pointer;
-          width: 100%;
-          aspect-ratio: 4 / 3;
-          display: block;
-      }}
-      .photo-gallery-{safe_prefix} .photo-card img {{
-          width: 100%;
-          height: 100%;
-          object-fit: cover;
-          display: block;
-      }}
-      .photo-gallery-{safe_prefix} .photo-card:active {{
-          opacity: .75;
-      }}
-      #{overlay_id} {{
-          display: none;
-          position: fixed;
-          inset: 0;
-          z-index: 999999;
-          background: rgba(0,0,0,.90);
-          align-items: center;
-          justify-content: center;
-          padding: 18px;
-      }}
-      #{overlay_id}.open {{
-          display: flex;
-      }}
-      #{overlay_id} img {{
-          max-width: 96vw;
-          max-height: 92vh;
-          width: auto;
-          height: auto;
-          object-fit: contain;
-          border-radius: 8px;
-      }}
-      #{overlay_id} .photo-close {{
-          position: fixed;
-          top: 12px;
-          right: 14px;
-          width: 44px;
-          height: 44px;
-          border: 0;
-          border-radius: 50%;
-          background: rgba(255,255,255,.20);
-          color: white;
-          font-size: 30px;
-          line-height: 1;
-          cursor: pointer;
-      }}
-      @media (max-width: 700px) {{
-          .photo-gallery-{safe_prefix} {{
-              grid-template-columns: repeat(2, minmax(0, 1fr));
-              gap: 8px;
-          }}
-          #{overlay_id} {{
-              padding: 10px;
-          }}
-          #{overlay_id} img {{
-              max-width: 98vw;
-              max-height: 88vh;
-          }}
-      }}
-    </style>
-
-    <div class="photo-gallery-{safe_prefix}">
-        {''.join(cards)}
-    </div>
-
-    <div id="{overlay_id}" onclick="closePhoto_{safe_prefix}(event)">
-        <button type="button" class="photo-close"
-                onclick="closePhoto_{safe_prefix}(event)">×</button>
-        <img id="{image_id}" src="" alt="Увеличенное фото"
-             onclick="event.stopPropagation()" />
-    </div>
-
-    <script>
-      function openPhoto_{safe_prefix}(url) {{
-          const overlay = document.getElementById("{overlay_id}");
-          const image = document.getElementById("{image_id}");
-          if (!overlay || !image) return;
-          image.src = url;
-          overlay.classList.add("open");
-          document.body.style.overflow = "hidden";
-      }}
-
-      function closePhoto_{safe_prefix}(event) {{
-          if (event) event.stopPropagation();
-          const overlay = document.getElementById("{overlay_id}");
-          const image = document.getElementById("{image_id}");
-          if (!overlay || !image) return;
-          overlay.classList.remove("open");
-          image.src = "";
-          document.body.style.overflow = "";
-      }}
-    </script>
-    """
-
-    st.html(gallery, unsafe_allow_javascript=True)
+            if st.button(
+                "🔍 Увеличить",
+                key=f"{key_prefix}_open_{index}",
+                use_container_width=True,
+            ):
+                show_photo_dialog(photo["public_url"])
 
 
 user_name, user_role = login()
 
 if not user_name:
     st.stop()
-
 
 
 try:
@@ -316,7 +202,7 @@ with col_logout:
 
     if st.button(
         "🚪 Выйти",
-        width="stretch",
+        use_container_width=True,
     ):
 
         logout()
@@ -659,7 +545,7 @@ for route in routes:
                         f"complete_{point_key}"
                     ),
                     type="primary",
-                    width="stretch",
+                    use_container_width=True,
                 ):
 
                     if not photos:
@@ -768,7 +654,7 @@ for route in routes:
                                 f"edit_photos_"
                                 f"{visit['id']}"
                             ),
-                            width="stretch",
+                            use_container_width=True,
                         ):
 
                             st.session_state[
@@ -823,7 +709,7 @@ for route in routes:
                                     f"save_photos_"
                                     f"{visit['id']}"
                                 ),
-                                width="stretch",
+                                use_container_width=True,
                             ):
 
                                 if not new_photos:
@@ -867,7 +753,7 @@ for route in routes:
                                     f"cancel_photos_"
                                     f"{visit['id']}"
                                 ),
-                                width="stretch",
+                                use_container_width=True,
                             ):
 
                                 st.session_state[
@@ -938,7 +824,7 @@ for route in routes:
                             f"edit_button_"
                             f"{visit['id']}"
                         ),
-                        width="stretch",
+                        use_container_width=True,
                     ):
 
                         st.session_state[
@@ -976,7 +862,7 @@ for route in routes:
                                 f"save_comment_"
                                 f"{visit['id']}"
                             ),
-                            width="stretch",
+                            use_container_width=True,
                         ):
 
                             try:
@@ -1011,7 +897,7 @@ for route in routes:
                                 f"cancel_edit_"
                                 f"{visit['id']}"
                             ),
-                            width="stretch",
+                            use_container_width=True,
                         ):
 
                             st.session_state[
@@ -1120,7 +1006,7 @@ for route in routes:
                             f"{visit['id']}"
                         ),
                         type="primary",
-                        width="stretch",
+                        use_container_width=True,
                     ):
 
                         if not new_discussion_comment.strip():
@@ -1198,7 +1084,7 @@ for route in routes:
                     key=(
                         f"reset_{point_key}"
                     ),
-                    width="stretch",
+                    use_container_width=True,
                 ):
 
                     try:
