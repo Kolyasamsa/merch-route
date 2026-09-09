@@ -5,6 +5,12 @@ from io import BytesIO
 import pandas as pd
 import streamlit as st
 
+
+@st.dialog("📷 Фотография", width="large")
+def show_photo_dialog(photo_url):
+    st.image(photo_url, use_container_width=True)
+
+
 from config import DAYS
 
 from routes import (
@@ -622,6 +628,18 @@ def show_supervisor_dashboard(
                                             ],
                                             use_container_width=True,
                                         )
+
+                                        if st.button(
+                                            "🔍 Увеличить",
+                                            key=(
+                                                f"supervisor_open_photo_"
+                                                f"{visit['id']}_{index}"
+                                            ),
+                                            use_container_width=True,
+                                        ):
+                                            show_photo_dialog(
+                                                photo["public_url"]
+                                            )
 
                             else:
 
