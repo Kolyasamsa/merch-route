@@ -3,6 +3,11 @@ from html import escape
 
 import streamlit as st
 
+@st.dialog("📷 Фотография", width="large")
+def show_photo_dialog(photo_url):
+    st.image(photo_url, use_container_width=True)
+
+
 from auth import login, logout
 
 from supervisor import (
