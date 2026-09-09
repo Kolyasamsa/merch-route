@@ -1,4 +1,6 @@
 from datetime import date
+from urllib.parse import quote
+from uuid import uuid4
 import calendar
 from io import BytesIO
 
@@ -9,6 +11,17 @@ import streamlit as st
 @st.dialog("📷 Фотография", width="large")
 def show_photo_dialog(photo_url):
     st.image(photo_url, use_container_width=True)
+
+
+def open_photo_from_query():
+    photo_url = st.query_params.get("photo")
+    last_photo = st.session_state.get("_opened_photo")
+
+    if photo_url and photo_url != last_photo:
+        st.session_state["_opened_photo"] = photo_url
+        show_photo_dialog(photo_url)
+    elif not photo_url:
+        st.session_state.pop("_opened_photo", None)
 
 
 from config import DAYS
@@ -34,6 +47,66 @@ from utils import (
     get_dates_for_weekday,
     get_default_date,
 )
+
+
+def render_photo_grid(photos, key_prefix="photo"):
+    if not photos:
+        return
+
+    items = []
+    click_token = uuid4().hex
+
+    for photo in photos:
+        url = photo["public_url"]
+        href = (
+            "?photo=" + quote(url, safe="")
+            + "&photo_click=" + click_token
+        )
+        items.append(
+            f'<a class="photo-thumb" href="{href}">'
+            f'<img src="{url}" loading="lazy" />'
+            f'</a>'
+        )
+
+    st.markdown(
+        """
+        <style>
+        .photo-grid {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 10px;
+            margin: 8px 0 14px 0;
+        }
+        .photo-thumb {
+            display: block;
+            width: 100%;
+            aspect-ratio: 4 / 3;
+            overflow: hidden;
+            border-radius: 12px;
+            border: 1px solid rgba(128, 128, 128, 0.22);
+            background: rgba(128, 128, 128, 0.08);
+            cursor: pointer;
+        }
+        .photo-thumb img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+        }
+        @media (max-width: 700px) {
+            .photo-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    st.markdown(
+        '<div class="photo-grid">' + ''.join(items) + '</div>',
+        unsafe_allow_html=True,
+    )
 
 
 def show_timesheet(df):
@@ -211,6 +284,8 @@ def show_supervisor_dashboard(
     supervisor,
     logout,
 ):
+
+    open_photo_from_query()
 
     col_title, col_logout = st.columns(
         [4, 1]
@@ -612,34 +687,10 @@ def show_supervisor_dashboard(
                                     "📷 **Фотографии:**"
                                 )
 
-                                columns = st.columns(3)
-
-                                for index, photo in enumerate(
-                                    photos
-                                ):
-
-                                    with columns[
-                                        index % 3
-                                    ]:
-
-                                        st.image(
-                                            photo[
-                                                "public_url"
-                                            ],
-                                            use_container_width=True,
-                                        )
-
-                                        if st.button(
-                                            "🔍 Увеличить",
-                                            key=(
-                                                f"supervisor_open_photo_"
-                                                f"{visit['id']}_{index}"
-                                            ),
-                                            use_container_width=True,
-                                        ):
-                                            show_photo_dialog(
-                                                photo["public_url"]
-                                            )
+                                render_photo_grid(
+                                    photos,
+                                    f"supervisor_{visit['id']}",
+                                )
 
                             else:
 
