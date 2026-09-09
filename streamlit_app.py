@@ -1,22 +1,6 @@
 from datetime import date
-from urllib.parse import quote
-from uuid import uuid4
 import streamlit as st
-
-@st.dialog("📷 Фотография", width="large")
-def show_photo_dialog(photo_url):
-    st.image(photo_url, use_container_width=True)
-
-
-def open_photo_from_query():
-    photo_url = st.query_params.get("photo")
-    last_photo = st.session_state.get("_opened_photo")
-
-    if photo_url and photo_url != last_photo:
-        st.session_state["_opened_photo"] = photo_url
-        show_photo_dialog(photo_url)
-    elif not photo_url:
-        st.session_state.pop("_opened_photo", None)
+import streamlit.components.v1 as components
 
 
 from auth import login, logout
@@ -129,26 +113,46 @@ def render_photo_grid(photos, key_prefix="photo"):
     if not photos:
         return
 
-    items = []
-    click_token = uuid4().hex
+    import html
 
+    cards = []
     for photo in photos:
-        url = photo["public_url"]
-        href = (
-            "?photo=" + quote(url, safe="")
-            + "&photo_click=" + click_token
-        )
-
-        items.append(
-            f'<a class="photo-thumb" href="{href}">'
+        url = html.escape(photo["public_url"], quote=True)
+        cards.append(
+            f'<button class="photo-card" onclick="openPhoto(\'{url}\')">'
             f'<img src="{url}" loading="lazy" />'
-            f'</a>'
+            f'</button>'
         )
 
-    st.markdown(
-        '<div class="photo-grid">' + ''.join(items) + '</div>',
-        unsafe_allow_html=True,
-    )
+    gallery = """
+    <style>
+      * { box-sizing: border-box; }
+      body { margin: 0; font-family: sans-serif; }
+      .photo-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; width: 100%; }
+      .photo-card { padding: 0; border: 0; background: transparent; border-radius: 12px; overflow: hidden; cursor: pointer; width: 100%; aspect-ratio: 4 / 3; }
+      .photo-card img { width: 100%; height: 100%; object-fit: cover; display: block; }
+      .photo-card:active { opacity: .8; }
+      .overlay { display: none; position: fixed; inset: 0; z-index: 9999; background: rgba(0,0,0,.88); align-items: center; justify-content: center; padding: 18px; }
+      .overlay.open { display: flex; }
+      .overlay img { max-width: 100%; max-height: 90vh; object-fit: contain; border-radius: 8px; }
+      .close { position: fixed; top: 10px; right: 14px; width: 42px; height: 42px; border: 0; border-radius: 50%; background: rgba(255,255,255,.18); color: white; font-size: 28px; cursor: pointer; }
+      @media (max-width: 700px) { .photo-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; } }
+    </style>
+    <div class="photo-grid">__CARDS__</div>
+    <div class="overlay" id="photoOverlay" onclick="closePhoto(event)">
+      <button class="close" onclick="closePhoto(event)">×</button>
+      <img id="fullPhoto" src="" />
+    </div>
+    <script>
+      function openPhoto(url) { document.getElementById('fullPhoto').src = url; document.getElementById('photoOverlay').classList.add('open'); }
+      function closePhoto(e) { if (e) e.stopPropagation(); document.getElementById('photoOverlay').classList.remove('open'); document.getElementById('fullPhoto').src = ''; }
+    </script>
+    """.replace("__CARDS__", """ + ''.join(cards) + """ )
+
+    rows = (len(photos) + 2) // 3
+    mobile_rows = (len(photos) + 1) // 2
+    height = max(170, rows * 180 + 20, mobile_rows * 150 + 20)
+    components.html(gallery, height=height, scrolling=False)
 
 
 user_name, user_role = login()
@@ -156,7 +160,6 @@ user_name, user_role = login()
 if not user_name:
     st.stop()
 
-open_photo_from_query()
 
 
 try:
