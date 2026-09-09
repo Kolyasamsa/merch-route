@@ -1,9 +1,22 @@
 from datetime import date
+from urllib.parse import quote
+from uuid import uuid4
 import streamlit as st
 
 @st.dialog("📷 Фотография", width="large")
 def show_photo_dialog(photo_url):
     st.image(photo_url, use_container_width=True)
+
+
+def open_photo_from_query():
+    photo_url = st.query_params.get("photo")
+    last_photo = st.session_state.get("_opened_photo")
+
+    if photo_url and photo_url != last_photo:
+        st.session_state["_opened_photo"] = photo_url
+        show_photo_dialog(photo_url)
+    elif not photo_url:
+        st.session_state.pop("_opened_photo", None)
 
 
 from auth import login, logout
@@ -79,6 +92,7 @@ st.markdown(
 
     .photo-thumb {
         display: block;
+        cursor: pointer;
         width: 100%;
         aspect-ratio: 4 / 3;
         overflow: hidden;
@@ -115,27 +129,34 @@ def render_photo_grid(photos, key_prefix="photo"):
     if not photos:
         return
 
-    columns = st.columns(3)
+    items = []
+    click_token = uuid4().hex
 
-    for index, photo in enumerate(photos):
-        with columns[index % 3]:
-            st.image(
-                photo["public_url"],
-                use_container_width=True,
-            )
+    for photo in photos:
+        url = photo["public_url"]
+        href = (
+            "?photo=" + quote(url, safe="")
+            + "&photo_click=" + click_token
+        )
 
-            if st.button(
-                "🔍 Увеличить",
-                key=f"{key_prefix}_open_{index}",
-                use_container_width=True,
-            ):
-                show_photo_dialog(photo["public_url"])
+        items.append(
+            f'<a class="photo-thumb" href="{href}">'
+            f'<img src="{url}" loading="lazy" />'
+            f'</a>'
+        )
+
+    st.markdown(
+        '<div class="photo-grid">' + ''.join(items) + '</div>',
+        unsafe_allow_html=True,
+    )
 
 
 user_name, user_role = login()
 
 if not user_name:
     st.stop()
+
+open_photo_from_query()
 
 
 try:
