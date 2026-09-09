@@ -4,7 +4,6 @@ from io import BytesIO
 
 import pandas as pd
 import streamlit as st
-import streamlit.components.v1 as components
 
 
 
@@ -37,46 +36,135 @@ def render_photo_grid(photos, key_prefix="photo"):
     if not photos:
         return
 
-    import html
+    safe_prefix = re.sub(r"[^a-zA-Z0-9_-]", "_", str(key_prefix))
+    overlay_id = f"photo_overlay_{safe_prefix}"
+    image_id = f"photo_full_{safe_prefix}"
 
     cards = []
-    for photo in photos:
-        url = html.escape(photo["public_url"], quote=True)
+    for index, photo in enumerate(photos):
+        url = str(photo["public_url"])
+        url_attr = html.escape(url, quote=True)
+        url_js = json.dumps(url)
         cards.append(
-            f'<button class="photo-card" onclick="openPhoto(\'{url}\')">'
-            f'<img src="{url}" loading="lazy" />'
+            f'<button type="button" class="photo-card" '
+            f'onclick="openPhoto_{safe_prefix}({html.escape(url_js, quote=True)})">'
+            f'<img src="{url_attr}" loading="lazy" alt="Фото {index + 1}" />'
             f'</button>'
         )
 
-    gallery = """
+    gallery = f"""
     <style>
-      * { box-sizing: border-box; }
-      body { margin: 0; font-family: sans-serif; }
-      .photo-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; width: 100%; }
-      .photo-card { padding: 0; border: 0; background: transparent; border-radius: 12px; overflow: hidden; cursor: pointer; width: 100%; aspect-ratio: 4 / 3; }
-      .photo-card img { width: 100%; height: 100%; object-fit: cover; display: block; }
-      .photo-card:active { opacity: .8; }
-      .overlay { display: none; position: fixed; inset: 0; z-index: 9999; background: rgba(0,0,0,.88); align-items: center; justify-content: center; padding: 18px; }
-      .overlay.open { display: flex; }
-      .overlay img { max-width: 100%; max-height: 90vh; object-fit: contain; border-radius: 8px; }
-      .close { position: fixed; top: 10px; right: 14px; width: 42px; height: 42px; border: 0; border-radius: 50%; background: rgba(255,255,255,.18); color: white; font-size: 28px; cursor: pointer; }
-      @media (max-width: 700px) { .photo-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; } }
+      .photo-gallery-{safe_prefix} {{
+          display: grid;
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+          gap: 10px;
+          width: 100%;
+          margin: 8px 0 14px;
+      }}
+      .photo-gallery-{safe_prefix} .photo-card {{
+          padding: 0;
+          border: 1px solid rgba(128,128,128,.22);
+          background: rgba(128,128,128,.08);
+          border-radius: 12px;
+          overflow: hidden;
+          cursor: pointer;
+          width: 100%;
+          aspect-ratio: 4 / 3;
+          display: block;
+      }}
+      .photo-gallery-{safe_prefix} .photo-card img {{
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+          display: block;
+      }}
+      .photo-gallery-{safe_prefix} .photo-card:active {{
+          opacity: .75;
+      }}
+      #{overlay_id} {{
+          display: none;
+          position: fixed;
+          inset: 0;
+          z-index: 999999;
+          background: rgba(0,0,0,.90);
+          align-items: center;
+          justify-content: center;
+          padding: 18px;
+      }}
+      #{overlay_id}.open {{
+          display: flex;
+      }}
+      #{overlay_id} img {{
+          max-width: 96vw;
+          max-height: 92vh;
+          width: auto;
+          height: auto;
+          object-fit: contain;
+          border-radius: 8px;
+      }}
+      #{overlay_id} .photo-close {{
+          position: fixed;
+          top: 12px;
+          right: 14px;
+          width: 44px;
+          height: 44px;
+          border: 0;
+          border-radius: 50%;
+          background: rgba(255,255,255,.20);
+          color: white;
+          font-size: 30px;
+          line-height: 1;
+          cursor: pointer;
+      }}
+      @media (max-width: 700px) {{
+          .photo-gallery-{safe_prefix} {{
+              grid-template-columns: repeat(2, minmax(0, 1fr));
+              gap: 8px;
+          }}
+          #{overlay_id} {{
+              padding: 10px;
+          }}
+          #{overlay_id} img {{
+              max-width: 98vw;
+              max-height: 88vh;
+          }}
+      }}
     </style>
-    <div class="photo-grid">__CARDS__</div>
-    <div class="overlay" id="photoOverlay" onclick="closePhoto(event)">
-      <button class="close" onclick="closePhoto(event)">×</button>
-      <img id="fullPhoto" src="" />
-    </div>
-    <script>
-      function openPhoto(url) { document.getElementById('fullPhoto').src = url; document.getElementById('photoOverlay').classList.add('open'); }
-      function closePhoto(e) { if (e) e.stopPropagation(); document.getElementById('photoOverlay').classList.remove('open'); document.getElementById('fullPhoto').src = ''; }
-    </script>
-    """.replace("__CARDS__", """ + ''.join(cards) + """ )
 
-    rows = (len(photos) + 2) // 3
-    mobile_rows = (len(photos) + 1) // 2
-    height = max(170, rows * 180 + 20, mobile_rows * 150 + 20)
-    components.html(gallery, height=height, scrolling=False)
+    <div class="photo-gallery-{safe_prefix}">
+        {''.join(cards)}
+    </div>
+
+    <div id="{overlay_id}" onclick="closePhoto_{safe_prefix}(event)">
+        <button type="button" class="photo-close"
+                onclick="closePhoto_{safe_prefix}(event)">×</button>
+        <img id="{image_id}" src="" alt="Увеличенное фото"
+             onclick="event.stopPropagation()" />
+    </div>
+
+    <script>
+      function openPhoto_{safe_prefix}(url) {{
+          const overlay = document.getElementById("{overlay_id}");
+          const image = document.getElementById("{image_id}");
+          if (!overlay || !image) return;
+          image.src = url;
+          overlay.classList.add("open");
+          document.body.style.overflow = "hidden";
+      }}
+
+      function closePhoto_{safe_prefix}(event) {{
+          if (event) event.stopPropagation();
+          const overlay = document.getElementById("{overlay_id}");
+          const image = document.getElementById("{image_id}");
+          if (!overlay || !image) return;
+          overlay.classList.remove("open");
+          image.src = "";
+          document.body.style.overflow = "";
+      }}
+    </script>
+    """
+
+    st.html(gallery, unsafe_allow_javascript=True)
 
 
 def show_timesheet(df):
@@ -216,7 +304,7 @@ def show_timesheet(df):
 
     st.dataframe(
         timesheet_df,
-        use_container_width=True,
+        width="stretch",
         hide_index=True,
     )
 
@@ -245,7 +333,7 @@ def show_timesheet(df):
             "application/vnd.openxmlformats-"
             "officedocument.spreadsheetml.sheet"
         ),
-        use_container_width=True,
+        width="stretch",
     )
 
 
@@ -276,7 +364,7 @@ def show_supervisor_dashboard(
 
         if st.button(
             "🚪 Выйти",
-            use_container_width=True,
+            width="stretch",
         ):
 
             logout()
@@ -784,7 +872,7 @@ def show_supervisor_dashboard(
 
                                 type="primary",
 
-                                use_container_width=True,
+                                width="stretch",
                             ):
 
                                 if not new_comment.strip():
