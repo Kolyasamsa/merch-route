@@ -1,6 +1,4 @@
 from datetime import date
-from html import escape
-
 import streamlit as st
 
 @st.dialog("📷 Фотография", width="large")
@@ -113,23 +111,25 @@ st.markdown(
 )
 
 
-def render_photo_grid(photos):
+def render_photo_grid(photos, key_prefix="photo"):
     if not photos:
         return
 
-    items = []
-    for photo in photos:
-        url = escape(photo["public_url"], quote=True)
-        items.append(
-            f'<a class="photo-thumb" href="{url}" target="_blank" rel="noopener noreferrer">'
-            f'<img src="{url}" loading="lazy" />'
-            f'</a>'
-        )
+    columns = st.columns(3)
 
-    st.markdown(
-        '<div class="photo-grid">' + ''.join(items) + '</div>',
-        unsafe_allow_html=True,
-    )
+    for index, photo in enumerate(photos):
+        with columns[index % 3]:
+            st.image(
+                photo["public_url"],
+                use_container_width=True,
+            )
+
+            if st.button(
+                "🔍 Увеличить",
+                key=f"{key_prefix}_open_{index}",
+                use_container_width=True,
+            ):
+                show_photo_dialog(photo["public_url"])
 
 
 user_name, user_role = login()
@@ -639,7 +639,7 @@ for route in routes:
 
                         if saved_photos:
 
-                            render_photo_grid(saved_photos)
+                            render_photo_grid(saved_photos, f"worker_{visit['id']}")
 
                         else:
 
@@ -678,7 +678,7 @@ for route in routes:
                             )
 
 
-                            render_photo_grid(saved_photos)
+                            render_photo_grid(saved_photos, f"worker_{visit['id']}")
 
 
                         new_photos = st.file_uploader(
