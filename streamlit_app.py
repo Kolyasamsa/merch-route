@@ -29,8 +29,6 @@ from database import (
     clear_database_cache,
     get_visit_comments,
     create_visit_comment,
-    get_unread_comments_for_worker,
-    mark_comment_as_read,
 )
 
 from utils import (
@@ -41,10 +39,6 @@ from utils import (
 )
 
 
-# =========================================================
-# НАСТРОЙКИ
-# =========================================================
-
 st.set_page_config(
     page_title="Маршруты мерчендайзеров",
     page_icon="📍",
@@ -52,19 +46,11 @@ st.set_page_config(
 )
 
 
-# =========================================================
-# АВТОРИЗАЦИЯ
-# =========================================================
-
 user_name, user_role = login()
 
 if not user_name:
     st.stop()
 
-
-# =========================================================
-# ЗАГРУЗКА ДАННЫХ
-# =========================================================
 
 try:
 
@@ -77,172 +63,21 @@ except Exception as error:
     )
 
     st.stop()
-# =========================================================
-# КАБИНЕТ СУПЕРВАЙЗЕРА
-# =========================================================
+
 
 if user_role == "supervisor":
 
     show_supervisor_dashboard(
-
         df,
-
         user_name,
-
         logout,
     )
 
     st.stop()
 
 
-# =========================================================
-# КАБИНЕТ МЕРЧЕНДАЙЗЕРА
-# =========================================================
-
 worker = user_name
-# =========================================================
-# НОВЫЕ КОММЕНТАРИИ ОТ СУПЕРВАЙЗЕРА
-# =========================================================
 
-try:
-
-    unread_comments = (
-        get_unread_comments_for_worker(
-            worker
-        )
-    )
-
-    if unread_comments:
-
-        st.divider()
-
-        st.subheader(
-            f"🔔 Новые комментарии ({len(unread_comments)})"
-        )
-
-        st.warning(
-            "Супервайзер оставил новые комментарии "
-            "к вашим торговым точкам."
-        )
-
-        for unread_comment in unread_comments:
-
-            point_visit = (
-                unread_comment.get(
-                    "point_visits",
-                    {},
-                )
-            )
-
-            visit_date = (
-                point_visit.get(
-                    "visit_date",
-                    "",
-                )
-            )
-
-            route_name = (
-                point_visit.get(
-                    "route",
-                    "",
-                )
-            )
-
-            shop_name = (
-                point_visit.get(
-                    "shop",
-                    "",
-                )
-            )
-
-            address = (
-                point_visit.get(
-                    "address",
-                    "",
-                )
-            )
-
-            comment_text = (
-                unread_comment.get(
-                    "comment",
-                    "",
-                )
-            )
-
-            comment_id = (
-                unread_comment.get(
-                    "id"
-                )
-            )
-
-            with st.expander(
-
-                f"🔔 {shop_name} — {address}"
-
-            ):
-
-                if visit_date:
-
-                    st.write(
-                        f"📅 **Дата:** "
-                        f"{visit_date}"
-                    )
-
-                if route_name:
-
-                    st.write(
-                        f"🚗 **Маршрут:** "
-                        f"{route_name}"
-                    )
-
-                st.divider()
-
-                st.write(
-                    "👩‍💼 **Комментарий супервайзера:**"
-                )
-
-                st.write(
-                    comment_text
-                )
-
-                if st.button(
-
-                    "✓ Прочитано",
-
-                    key=(
-                        f"read_comment_"
-                        f"{comment_id}"
-                    ),
-
-                    use_container_width=True,
-                ):
-
-                    try:
-
-                        mark_comment_as_read(
-                            comment_id
-                        )
-
-                        st.rerun()
-
-                    except Exception as error:
-
-                        st.error(
-
-                            f"Ошибка: {error}"
-                        )
-
-except Exception as error:
-
-    st.warning(
-
-        f"Не удалось загрузить новые "
-        f"комментарии: {error}"
-    )
-
-# =========================================================
-# ПРОВЕРКА МЕРЧЕНДАЙЗЕРА
-# =========================================================
 
 if worker not in df["Мерчендайзер"].unique():
 
@@ -258,10 +93,6 @@ if worker not in df["Мерчендайзер"].unique():
 
     st.stop()
 
-
-# =========================================================
-# ЗАГОЛОВОК
-# =========================================================
 
 col_title, col_logout = st.columns(
     [4, 1]
@@ -284,18 +115,12 @@ with col_logout:
     st.write("")
 
     if st.button(
-
         "🚪 Выйти",
-
         use_container_width=True,
     ):
 
         logout()
 
-
-# =========================================================
-# ДАННЫЕ МЕРЧЕНДАЙЗЕРА
-# =========================================================
 
 worker_data = get_worker_data(
     df,
@@ -308,15 +133,9 @@ available_days = get_available_days(
 )
 
 
-# =========================================================
-# ВЫБОР ДНЯ
-# =========================================================
-
 today = date.today()
 
-today_day_index = (
-    today.weekday()
-)
+today_day_index = today.weekday()
 
 
 default_day = (
@@ -342,45 +161,29 @@ day_index = (
 
 
 day = st.selectbox(
-
     "📅 День маршрута",
-
     available_days,
-
     index=day_index,
 )
 
 
-# =========================================================
-# ВЫБОР ГОДА И МЕСЯЦА
-# =========================================================
-
 year_options = [
-
     today.year - 1,
-
     today.year,
-
     today.year + 1,
 ]
 
 
 year = st.selectbox(
-
     "📅 Год",
-
     year_options,
-
     index=1,
 )
 
 
 month_name = st.selectbox(
-
     "📅 Месяц",
-
     MONTHS,
-
     index=today.month - 1,
 )
 
@@ -393,25 +196,16 @@ month = (
 )
 
 
-# =========================================================
-# ДОСТУПНЫЕ ДАТЫ
-# =========================================================
-
 available_dates = (
-
     get_dates_for_weekday(
-
         year,
-
         month,
-
         day,
     )
 )
 
 
 default_date = (
-
     get_default_date(
         available_dates
     )
@@ -419,17 +213,12 @@ default_date = (
 
 
 selected_date = st.selectbox(
-
     "📆 Дата маршрута",
-
     available_dates,
-
     index=available_dates.index(
         default_date
     ),
-
     format_func=lambda value: (
-
         value.strftime(
             "%d.%m.%Y"
         )
@@ -438,44 +227,28 @@ selected_date = st.selectbox(
 
 
 selected_date_string = (
-
     selected_date.strftime(
         "%Y-%m-%d"
     )
 )
 
 
-# =========================================================
-# МАРШРУТЫ НА ДЕНЬ
-# =========================================================
-
 day_data, routes = (
-
     get_routes_for_day(
-
         worker_data,
-
         day,
     )
 )
 
 
-# =========================================================
-# ЗАГРУЖАЕМ ПРОЙДЕННЫЕ ТТ
-# =========================================================
-
 try:
 
     visits = (
-
         get_completed_visits(
-
             selected_date_string,
-
             worker,
         )
     )
-
 
 except Exception as error:
 
@@ -486,32 +259,19 @@ except Exception as error:
     visits = []
 
 
-# =========================================================
-# СЛОВАРЬ ПРОЙДЕННЫХ ТТ
-# =========================================================
-
 completed_visits = {
 
     get_point_key(
-
         visit["worker"],
-
         visit["weekday"],
-
         visit["route"],
-
         visit["shop"],
-
         visit["address"],
     ): visit
 
     for visit in visits
 }
 
-
-# =========================================================
-# ОБЩАЯ ИНФОРМАЦИЯ
-# =========================================================
 
 st.divider()
 
@@ -522,9 +282,7 @@ st.subheader(
 
 
 st.write(
-
     f"📅 **{day}, "
-
     f"{selected_date.strftime('%d.%m.%Y')}**"
 )
 
@@ -539,15 +297,9 @@ st.write(
 )
 
 
-# =========================================================
-# ВЫВОД МАРШРУТОВ
-# =========================================================
-
 for route in routes:
 
-
     route_data = day_data[
-
         day_data["Маршрут"] == route
     ]
 
@@ -557,36 +309,22 @@ for route in routes:
     )
 
 
-    # -----------------------------------------------------
-    # ПОДСЧЁТ ПРОЙДЕННЫХ ТТ
-    # -----------------------------------------------------
-
     completed_count = sum(
 
         get_point_key(
-
             worker,
-
             day,
-
             route,
-
             point["Магазин"],
-
             point["Адрес"],
         )
 
         in completed_visits
 
         for _, point
-
         in route_data.iterrows()
     )
 
-
-    # -----------------------------------------------------
-    # ЗАГОЛОВОК МАРШРУТА
-    # -----------------------------------------------------
 
     st.divider()
 
@@ -597,11 +335,8 @@ for route in routes:
 
 
     st.progress(
-
         completed_count / total_points
-
         if total_points
-
         else 0
     )
 
@@ -610,46 +345,27 @@ for route in routes:
 
 
     col1.metric(
-
         "Пройдено",
-
         completed_count,
     )
 
 
     col2.metric(
-
         "Осталось",
-
         total_points - completed_count,
     )
 
 
     col3.metric(
-
         "Всего",
-
         total_points,
     )
 
 
-    # =====================================================
-    # ТОРГОВЫЕ ТОЧКИ
-    # =====================================================
-
-    for number, (
-
-        _,
-
-        point,
-
-    ) in enumerate(
-
+    for number, (_, point) in enumerate(
         route_data.iterrows(),
-
         start=1,
     ):
-
 
         shop = point["Магазин"]
 
@@ -657,62 +373,46 @@ for route in routes:
 
 
         point_key = get_point_key(
-
             worker,
-
             day,
-
             route,
-
             shop,
-
             address,
         )
 
 
         visit = (
-
             completed_visits
             .get(point_key)
         )
 
 
         is_completed = (
-
             visit is not None
         )
 
 
         status = (
-
             "🟢"
-
             if is_completed
-
             else "🔴"
         )
 
 
         status_text = (
-
             "Пройдена"
-
             if is_completed
-
             else "Не пройдена"
         )
 
 
         with st.expander(
-
             f"{status} "
             f"{number}. "
             f"{shop} — "
             f"{address} "
             f"({status_text})"
-
         ):
-
 
             st.write(
                 f"🏪 **Магазин:** {shop}"
@@ -724,24 +424,16 @@ for route in routes:
             )
 
 
-            # =============================================
-            # НЕ ПРОЙДЕНА
-            # =============================================
-
             if not is_completed:
 
                 photos = st.file_uploader(
-
                     "📷 Добавить фотографии",
-
                     type=[
                         "jpg",
                         "jpeg",
                         "png",
                     ],
-
                     accept_multiple_files=True,
-
                     key=(
                         f"photos_{point_key}"
                     ),
@@ -749,16 +441,12 @@ for route in routes:
 
 
                 comment = st.text_area(
-
                     "💬 Комментарий",
-
                     placeholder=(
-
                         "Например: товара нет, "
                         "малый остаток, "
                         "причина отсутствия..."
                     ),
-
                     key=(
                         f"comment_{point_key}"
                     ),
@@ -766,15 +454,11 @@ for route in routes:
 
 
                 if st.button(
-
                     "✓ ЗАВЕРШИТЬ ТТ",
-
                     key=(
                         f"complete_{point_key}"
                     ),
-
                     type="primary",
-
                     use_container_width=True,
                 ):
 
@@ -789,24 +473,14 @@ for route in routes:
 
                         try:
 
-                            new_visit = (
-
-                                create_visit(
-
-                                    selected_date_string,
-
-                                    worker,
-
-                                    day,
-
-                                    route,
-
-                                    shop,
-
-                                    address,
-
-                                    comment,
-                                )
+                            new_visit = create_visit(
+                                selected_date_string,
+                                worker,
+                                day,
+                                route,
+                                shop,
+                                address,
+                                comment,
                             )
 
 
@@ -816,9 +490,7 @@ for route in routes:
 
 
                             upload_visit_photos(
-
                                 photos,
-
                                 visit_id,
                             )
 
@@ -836,10 +508,6 @@ for route in routes:
                             )
 
 
-            # =============================================
-            # ПРОЙДЕНА
-            # =============================================
-
             else:
 
                 st.success(
@@ -848,373 +516,14 @@ for route in routes:
 
 
                 # =============================================
-                # КОММЕНТАРИЙ
-                # =============================================
-
-                st.divider()
-
-
-                st.write(
-                    "💬 **Комментарий:**"
-                )
-
-
-                # Уникальный ключ режима редактирования
-                edit_mode_key = (
-                    f"edit_mode_{visit['id']}"
-                )
-
-
-                # Если режим ещё не создан
-                if edit_mode_key not in st.session_state:
-
-                    st.session_state[
-                        edit_mode_key
-                    ] = False
-
-
-                # =============================================
-                # ОБЫЧНЫЙ РЕЖИМ
-                # =============================================
-
-                if not st.session_state[
-                    edit_mode_key
-                ]:
-
-
-                    saved_comment = visit.get(
-
-                        "comment",
-
-                        "",
-                    )
-
-
-                    if saved_comment:
-
-
-                        st.write(
-                            saved_comment
-                        )
-
-
-                    else:
-
-
-                        st.caption(
-                            "Комментарий отсутствует"
-                        )
-
-
-                    if st.button(
-
-                        "✏️ Редактировать комментарий",
-
-                        key=(
-                            f"edit_button_"
-                            f"{visit['id']}"
-                        ),
-
-                        use_container_width=True,
-                    ):
-
-
-                        st.session_state[
-                            edit_mode_key
-                        ] = True
-
-
-                        st.rerun()
-
-
-                # =============================================
-                # РЕЖИМ РЕДАКТИРОВАНИЯ
-                # =============================================
-
-                else:
-
-
-                    edited_comment = st.text_area(
-
-                        "Комментарий к ТТ",
-
-                        value=visit.get(
-
-                            "comment",
-
-                            "",
-                        ),
-
-                        key=(
-                            f"edit_comment_"
-                            f"{visit['id']}"
-                        ),
-                    )
-
-
-                    col_save, col_cancel = (
-                        st.columns(2)
-                    )
-
-
-                    with col_save:
-
-
-                        if st.button(
-
-                            "💾 Сохранить",
-
-                            key=(
-                                f"save_comment_"
-                                f"{visit['id']}"
-                            ),
-
-                            use_container_width=True,
-                        ):
-
-
-                            try:
-
-
-                                update_visit_comment(
-
-                                    visit["id"],
-
-                                    edited_comment,
-                                )
-
-
-                                # Закрываем режим редактирования
-                                st.session_state[
-                                    edit_mode_key
-                                ] = False
-
-
-                                st.rerun()
-
-
-                            except Exception as error:
-
-
-                                st.error(
-
-                                    f"Ошибка сохранения "
-                                    f"комментария: {error}"
-                                )
-
-
-                    with col_cancel:
-
-
-                        if st.button(
-
-                            "✖ Отмена",
-
-                            key=(
-                                f"cancel_edit_"
-                                f"{visit['id']}"
-                            ),
-
-                            use_container_width=True,
-                        ):
-
-
-                            # Закрываем редактор без сохранения
-                            st.session_state[
-                                edit_mode_key
-                            ] = False
-
-
-                            st.rerun()
-                # =============================================
-                # ОБСУЖДЕНИЕ ТТ
-                # =============================================
-
-                st.divider()
-
-                st.subheader(
-                    "💬 Обсуждение ТТ"
-                )
-
-                try:
-
-                    visit_comments = (
-                        get_visit_comments(
-                            visit["id"]
-                        )
-                    )
-
-                    # -----------------------------------------
-                    # СУЩЕСТВУЮЩИЕ КОММЕНТАРИИ
-                    # -----------------------------------------
-
-                    if visit_comments:
-
-                        for visit_comment in visit_comments:
-
-                            author = (
-                                visit_comment.get(
-                                    "author",
-                                    "Неизвестно",
-                                )
-                            )
-
-                            author_role = (
-                                visit_comment.get(
-                                    "author_role",
-                                    "",
-                                )
-                            )
-
-                            comment_text = (
-                                visit_comment.get(
-                                    "comment",
-                                    "",
-                                )
-                            )
-
-                            created_at = (
-                                visit_comment.get(
-                                    "created_at",
-                                    "",
-                                )
-                            )
-
-                            if (
-                                author_role
-                                == "supervisor"
-                            ):
-
-                                role_text = (
-                                    "👩‍💼 Супервайзер"
-                                )
-
-                            else:
-
-                                role_text = (
-                                    "👤 Мерчендайзер"
-                                )
-
-                            st.markdown(
-                                f"**{role_text}: "
-                                f"{author}**"
-                            )
-
-                            st.write(
-                                comment_text
-                            )
-
-                            if created_at:
-
-                                st.caption(
-                                    f"🕒 {created_at}"
-                                )
-
-                            st.divider()
-
-                    else:
-
-                        st.caption(
-                            "Комментариев пока нет."
-                        )
-
-                    # -----------------------------------------
-                    # НОВЫЙ КОММЕНТАРИЙ МЕРЧЕНДАЙЗЕРА
-                    # -----------------------------------------
-
-                    new_discussion_comment = (
-                        st.text_area(
-
-                            "Ответить в обсуждении",
-
-                            placeholder=(
-                                "Напишите ответ "
-                                "супервайзеру..."
-                            ),
-
-                            key=(
-                                f"worker_discussion_comment_"
-                                f"{visit['id']}"
-                            ),
-                        )
-                    )
-
-                    if st.button(
-
-                        "💬 Отправить ответ",
-
-                        key=(
-                            f"send_worker_discussion_comment_"
-                            f"{visit['id']}"
-                        ),
-
-                        type="primary",
-
-                        use_container_width=True,
-                    ):
-
-                        if not (
-                            new_discussion_comment.strip()
-                        ):
-
-                            st.warning(
-                                "Введите комментарий."
-                            )
-
-                        else:
-
-                            try:
-
-                                create_visit_comment(
-
-                                    visit["id"],
-
-                                    worker,
-
-                                    "worker",
-
-                                    new_discussion_comment,
-                                )
-
-                                st.rerun()
-
-                            except Exception as error:
-
-                                st.error(
-
-                                    f"Ошибка отправки "
-                                    f"комментария: {error}"
-                                )
-
-                except Exception as error:
-
-                    st.warning(
-
-                        f"Не удалось загрузить "
-                        f"комментарии: {error}"
-                    )
-
-                # =============================================
-                # ВРЕМЯ ПРОХОЖДЕНИЯ
-                # =============================================
-
-                if visit.get(
-                    "completed_at"
-                ):
-
-
-                    st.write(
-
-                        f"🕒 **Время:** "
-                        f"{visit['completed_at']}"
-                    )
-
-
-                # =============================================
                 # ФОТОГРАФИИ
                 # =============================================
 
                 st.divider()
+
+                st.write(
+                    "📷 **Фотографии**"
+                )
 
 
                 photo_edit_mode_key = (
@@ -1222,7 +531,6 @@ for route in routes:
                 )
 
 
-                # Создаём состояние режима редактирования
                 if photo_edit_mode_key not in st.session_state:
 
                     st.session_state[
@@ -1239,48 +547,29 @@ for route in routes:
                     )
 
 
-                    # =========================================
-                    # ОБЫЧНЫЙ РЕЖИМ
-                    # =========================================
-
                     if not st.session_state[
                         photo_edit_mode_key
                     ]:
 
-
                         if saved_photos:
 
-
-                            st.write(
-                                "📷 **Фотографии:**"
-                            )
-
-
-                            columns = (
-                                st.columns(3)
-                            )
+                            columns = st.columns(3)
 
 
                             for index, photo in enumerate(
                                 saved_photos
                             ):
 
-
                                 with columns[
                                     index % 3
                                 ]:
 
-
                                     st.image(
-
                                         photo["public_url"],
-
                                         use_container_width=True,
                                     )
 
-
                         else:
-
 
                             st.info(
                                 "К этой ТТ нет фотографий."
@@ -1288,32 +577,22 @@ for route in routes:
 
 
                         if st.button(
-
                             "✏️ Заменить фотографии",
-
                             key=(
                                 f"edit_photos_"
                                 f"{visit['id']}"
                             ),
-
                             use_container_width=True,
                         ):
-
 
                             st.session_state[
                                 photo_edit_mode_key
                             ] = True
 
-
                             st.rerun()
 
 
-                    # =========================================
-                    # РЕЖИМ ЗАМЕНЫ
-                    # =========================================
-
                     else:
-
 
                         st.write(
                             "✏️ **Замена фотографий**"
@@ -1322,54 +601,40 @@ for route in routes:
 
                         if saved_photos:
 
-
                             st.caption(
                                 "Текущие фотографии:"
                             )
 
 
-                            columns = (
-                                st.columns(3)
-                            )
+                            columns = st.columns(3)
 
 
                             for index, photo in enumerate(
                                 saved_photos
                             ):
 
-
                                 with columns[
                                     index % 3
                                 ]:
 
-
                                     st.image(
-
                                         photo["public_url"],
-
                                         use_container_width=True,
                                     )
 
 
-                        new_photos = (
-
-                            st.file_uploader(
-
-                                "📷 Выберите новые фотографии",
-
-                                type=[
-                                    "jpg",
-                                    "jpeg",
-                                    "png",
-                                ],
-
-                                accept_multiple_files=True,
-
-                                key=(
-                                    f"replace_photos_"
-                                    f"{visit['id']}"
-                                ),
-                            )
+                        new_photos = st.file_uploader(
+                            "📷 Выберите новые фотографии",
+                            type=[
+                                "jpg",
+                                "jpeg",
+                                "png",
+                            ],
+                            accept_multiple_files=True,
+                            key=(
+                                f"replace_photos_"
+                                f"{visit['id']}"
+                            ),
                         )
 
 
@@ -1378,51 +643,34 @@ for route in routes:
                         )
 
 
-                        # =====================================
-                        # ЗАМЕНИТЬ
-                        # =====================================
-
                         with col_replace:
 
-
                             if st.button(
-
                                 "💾 Заменить",
-
                                 key=(
                                     f"save_photos_"
                                     f"{visit['id']}"
                                 ),
-
                                 use_container_width=True,
                             ):
 
-
                                 if not new_photos:
-
 
                                     st.warning(
                                         "Выберите хотя бы "
                                         "одну фотографию."
                                     )
 
-
                                 else:
-
 
                                     try:
 
-
                                         replace_visit_photos(
-
                                             new_photos,
-
                                             visit["id"],
                                         )
 
 
-                                        # Закрываем режим
-                                        # редактирования
                                         st.session_state[
                                             photo_edit_mode_key
                                         ] = False
@@ -1433,72 +681,370 @@ for route in routes:
 
                                     except Exception as error:
 
-
                                         st.error(
-
                                             f"Ошибка замены "
                                             f"фотографий: {error}"
                                         )
 
 
-                        # =====================================
-                        # ОТМЕНА
-                        # =====================================
-
                         with col_cancel:
 
-
                             if st.button(
-
                                 "✖ Отмена",
-
                                 key=(
                                     f"cancel_photos_"
                                     f"{visit['id']}"
                                 ),
-
                                 use_container_width=True,
                             ):
-
 
                                 st.session_state[
                                     photo_edit_mode_key
                                 ] = False
-
 
                                 st.rerun()
 
 
                 except Exception as error:
 
-
                     st.warning(
-
                         f"Не удалось загрузить фотографии: "
                         f"{error}"
                     )
 
-                # -----------------------------------------
+
+                # =============================================
+                # КОММЕНТАРИЙ МЕРЧЕНДАЙЗЕРА
+                # =============================================
+
+                st.divider()
+
+
+                st.write(
+                    "📝 **Комментарий мерчендайзера**"
+                )
+
+
+                edit_mode_key = (
+                    f"edit_mode_{visit['id']}"
+                )
+
+
+                if edit_mode_key not in st.session_state:
+
+                    st.session_state[
+                        edit_mode_key
+                    ] = False
+
+
+                if not st.session_state[
+                    edit_mode_key
+                ]:
+
+                    saved_comment = visit.get(
+                        "comment",
+                        "",
+                    )
+
+
+                    if saved_comment:
+
+                        st.write(
+                            saved_comment
+                        )
+
+                    else:
+
+                        st.caption(
+                            "Комментарий отсутствует"
+                        )
+
+
+                    if st.button(
+                        "✏️ Редактировать комментарий",
+                        key=(
+                            f"edit_button_"
+                            f"{visit['id']}"
+                        ),
+                        use_container_width=True,
+                    ):
+
+                        st.session_state[
+                            edit_mode_key
+                        ] = True
+
+                        st.rerun()
+
+
+                else:
+
+                    edited_comment = st.text_area(
+                        "Комментарий к ТТ",
+                        value=visit.get(
+                            "comment",
+                            "",
+                        ),
+                        key=(
+                            f"edit_comment_"
+                            f"{visit['id']}"
+                        ),
+                    )
+
+
+                    col_save, col_cancel = (
+                        st.columns(2)
+                    )
+
+
+                    with col_save:
+
+                        if st.button(
+                            "💾 Сохранить",
+                            key=(
+                                f"save_comment_"
+                                f"{visit['id']}"
+                            ),
+                            use_container_width=True,
+                        ):
+
+                            try:
+
+                                update_visit_comment(
+                                    visit["id"],
+                                    edited_comment,
+                                )
+
+
+                                st.session_state[
+                                    edit_mode_key
+                                ] = False
+
+
+                                st.rerun()
+
+
+                            except Exception as error:
+
+                                st.error(
+                                    f"Ошибка сохранения "
+                                    f"комментария: {error}"
+                                )
+
+
+                    with col_cancel:
+
+                        if st.button(
+                            "✖ Отмена",
+                            key=(
+                                f"cancel_edit_"
+                                f"{visit['id']}"
+                            ),
+                            use_container_width=True,
+                        ):
+
+                            st.session_state[
+                                edit_mode_key
+                            ] = False
+
+                            st.rerun()
+
+
+                # =============================================
+                # ОБСУЖДЕНИЕ С СУПЕРВАЙЗЕРОМ
+                # =============================================
+
+                st.divider()
+
+
+                st.write(
+                    "💬 **Обсуждение с супервайзером**"
+                )
+
+
+                try:
+
+                    visit_comments = (
+                        get_visit_comments(
+                            visit["id"]
+                        )
+                    )
+
+
+                    if visit_comments:
+
+                        for visit_comment in visit_comments:
+
+                            author = (
+                                visit_comment.get(
+                                    "author",
+                                    "Неизвестно",
+                                )
+                            )
+
+
+                            author_role = (
+                                visit_comment.get(
+                                    "author_role",
+                                    "",
+                                )
+                            )
+
+
+                            comment_text = (
+                                visit_comment.get(
+                                    "comment",
+                                    "",
+                                )
+                            )
+
+
+                            created_at = (
+                                visit_comment.get(
+                                    "created_at",
+                                    "",
+                                )
+                            )
+
+
+                            if author_role == "supervisor":
+
+                                st.markdown(
+                                    f"👩‍💼 **Супервайзер — {author}**"
+                                )
+
+                            else:
+
+                                st.markdown(
+                                    f"👤 **Мерчендайзер — {author}**"
+                                )
+
+
+                            st.write(
+                                comment_text
+                            )
+
+
+                            if created_at:
+
+                                st.caption(
+                                    f"🕒 {created_at}"
+                                )
+
+
+                            st.divider()
+
+
+                    else:
+
+                        st.caption(
+                            "Комментариев пока нет."
+                        )
+
+
+                    new_discussion_comment = (
+                        st.text_area(
+                            "Ответить в обсуждении",
+                            placeholder=(
+                                "Напишите ответ "
+                                "супервайзеру..."
+                            ),
+                            key=(
+                                f"worker_discussion_comment_"
+                                f"{visit['id']}"
+                            ),
+                        )
+                    )
+
+
+                    if st.button(
+                        "💬 Отправить ответ",
+                        key=(
+                            f"send_worker_discussion_comment_"
+                            f"{visit['id']}"
+                        ),
+                        type="primary",
+                        use_container_width=True,
+                    ):
+
+                        if not new_discussion_comment.strip():
+
+                            st.warning(
+                                "Введите комментарий."
+                            )
+
+                        else:
+
+                            try:
+
+                                create_visit_comment(
+                                    visit["id"],
+                                    worker,
+                                    "worker",
+                                    new_discussion_comment,
+                                )
+
+                                st.rerun()
+
+
+                            except Exception as error:
+
+                                st.error(
+                                    f"Ошибка отправки "
+                                    f"комментария: {error}"
+                                )
+
+
+                except Exception as error:
+
+                    st.warning(
+                        f"Не удалось загрузить "
+                        f"комментарии: {error}"
+                    )
+
+
+                # =============================================
+                # ДАТА ПРОХОЖДЕНИЯ
+                # =============================================
+
+                if visit.get(
+                    "completed_at"
+                ):
+
+                    completed_at = str(
+                        visit["completed_at"]
+                    )
+
+
+                    visit_date_display = (
+                        completed_at[:10]
+                    )
+
+
+                    st.divider()
+
+
+                    st.caption(
+                        f"📅 Дата прохождения: "
+                        f"{visit_date_display}"
+                    )
+
+
+                # =============================================
                 # СБРОС
-                # -----------------------------------------
+                # =============================================
 
                 st.divider()
 
 
                 if st.button(
-
                     "↩️ СБРОСИТЬ ПРОХОЖДЕНИЕ ТТ",
-
                     key=(
                         f"reset_{point_key}"
                     ),
-
                     use_container_width=True,
                 ):
 
-
                     try:
-
 
                         reset_visit(
                             visit["id"]
@@ -1512,7 +1058,6 @@ for route in routes:
 
 
                     except Exception as error:
-
 
                         st.error(
                             f"Ошибка сброса ТТ: {error}"
@@ -1539,32 +1084,23 @@ total_points = len(
 completed_points = sum(
 
     get_point_key(
-
         worker,
-
         day,
-
         point["Маршрут"],
-
         point["Магазин"],
-
         point["Адрес"],
     )
 
     in completed_visits
 
     for _, point
-
     in day_data.iterrows()
 )
 
 
 progress = (
-
     completed_points / total_points
-
     if total_points
-
     else 0
 )
 
@@ -1578,24 +1114,18 @@ col1, col2, col3 = st.columns(3)
 
 
 col1.metric(
-
     "Всего ТТ",
-
     total_points,
 )
 
 
 col2.metric(
-
     "Пройдено",
-
     completed_points,
 )
 
 
 col3.metric(
-
     "Осталось",
-
     total_points - completed_points,
 )
