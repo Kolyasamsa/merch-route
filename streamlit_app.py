@@ -1,6 +1,7 @@
 from datetime import date
 import streamlit as st
 import re
+import html
 
 
 from auth import login, logout
